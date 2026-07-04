@@ -292,3 +292,101 @@ html { scrollbar-width: none; -ms-overflow-style: none; }
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-up, .animate-float, .animate-marquee, .animate-pulse-glow, .animate-draw path, .skeleton::after, .glow::before { animation: none; }
 }
+
+/* ===========================================================================
+   Heavy glassmorphism — inner app (Hero-UI-Pro-style frosted glass)
+   =========================================================================== */
+
+/* Frosted panel. Sits over the app aurora so the blur has color to refract. */
+.glass-card {
+  position: relative;
+  background: color-mix(in srgb, var(--surface) 58%, transparent);
+  backdrop-filter: blur(22px) saturate(165%);
+  -webkit-backdrop-filter: blur(22px) saturate(165%);
+  border: 1px solid color-mix(in srgb, var(--foreground) 9%, transparent);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #ffffff 10%, transparent),
+    0 14px 38px -16px rgba(8, 8, 24, 0.5);
+}
+.dark .glass-card {
+  background: color-mix(in srgb, var(--surface) 44%, transparent);
+  border-color: color-mix(in srgb, #ffffff 8%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #ffffff 12%, transparent),
+    0 18px 46px -18px rgba(0, 0, 0, 0.7);
+}
+
+/* A subtly stronger sheet used for navigation surfaces. */
+.glass-nav {
+  background: color-mix(in srgb, var(--background) 60%, transparent);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+}
+
+/* Interactive lift for glass cards. */
+.glass-hover {
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+}
+.glass-hover:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--brand-500) 50%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #ffffff 16%, transparent),
+    0 22px 50px -18px rgba(99, 91, 255, 0.5);
+}
+
+/* Gradient hairline ring for hero/feature panels. */
+.glass-ring::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(140deg, color-mix(in srgb, #ffffff 45%, transparent), transparent 40%, color-mix(in srgb, var(--brand-500) 40%, transparent));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Ambient, fixed background for the dashboard — colorful blobs + faint grid. */
+.app-aurora {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.app-aurora::before,
+.app-aurora::after {
+  content: "";
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(100px);
+  opacity: 0.5;
+  animation: glow-drift 18s ease-in-out infinite alternate;
+}
+.app-aurora::before {
+  width: 46rem;
+  height: 46rem;
+  top: -14rem;
+  left: -10rem;
+  background: radial-gradient(circle at center, #635bff, transparent 62%);
+}
+.app-aurora::after {
+  width: 42rem;
+  height: 42rem;
+  bottom: -16rem;
+  right: -10rem;
+  background: radial-gradient(circle at center, #22d3ee, transparent 62%);
+  animation-delay: -6s;
+}
+.dark .app-aurora::before { opacity: 0.4; }
+.dark .app-aurora::after { opacity: 0.34; }
+
+@media (prefers-reduced-motion: reduce) {
+  .app-aurora::before,
+  .app-aurora::after { animation: none; }
+}

@@ -19,10 +19,10 @@ interface StatCardProps {
  */
 export default function StatCard({ label, value, hint, icon }: StatCardProps) {
   return (
-    <div className="border-gradient glass glow-ring animate-fade-up rounded-[var(--radius-lg)] p-4 sm:p-5">
+    <div className="glass-card glass-hover animate-fade-up p-4 sm:p-5">
       <div className="flex items-center gap-2">
         {icon ? (
-          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-sm)] brand-gradient text-white">
+          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-sm)] brand-gradient text-white shadow-[0_6px_16px_-6px_rgba(99,91,255,0.8)]">
             {icon}
           </span>
         ) : null}

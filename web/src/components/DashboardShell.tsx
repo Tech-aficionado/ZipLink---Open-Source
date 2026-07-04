@@ -82,7 +82,7 @@ function BottomTabs({ pathname }: { pathname: string }) {
   return (
     <nav
       aria-label="Dashboard"
-      className="glass fixed inset-x-0 bottom-0 z-40 border-t border-border pb-[env(safe-area-inset-bottom)] lg:hidden"
+      className="glass-nav fixed inset-x-0 bottom-0 z-40 border-t border-border pb-[env(safe-area-inset-bottom)] lg:hidden"
     >
       <div className="mx-auto flex max-w-md items-stretch justify-around">
         {NAV.map((item) => {
@@ -127,9 +127,10 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
 
   return (
     <ToastProvider>
-      <div className="min-h-dvh bg-background lg:flex">
+      <div className="relative min-h-dvh bg-background lg:flex">
+        <div className="app-aurora" aria-hidden="true" />
         {/* Desktop sidebar */}
-        <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-border bg-surface/40 px-4 py-5 backdrop-blur lg:flex">
+        <aside className="glass-nav fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-border px-4 py-5 lg:flex">
           <Link href="/" aria-label="Ziplink home" className="px-2">
             <Logo size={30} />
           </Link>
@@ -159,7 +160,7 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
         </aside>
 
         {/* Mobile top bar */}
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border bg-background/85 px-4 py-3 backdrop-blur lg:hidden">
+        <header className="glass-nav sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border px-4 py-3 lg:hidden">
           <Link href="/" aria-label="Ziplink home">
             <Logo size={28} />
           </Link>
@@ -176,7 +177,7 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
         </header>
 
         {/* Content */}
-        <div className="min-w-0 flex-1 lg:pl-60">
+        <div className="relative z-10 min-w-0 flex-1 lg:pl-60">
           <main className="mx-auto w-full max-w-5xl px-4 pb-24 pt-8 sm:px-6 sm:pt-10 lg:pb-10">
             {children}
           </main>

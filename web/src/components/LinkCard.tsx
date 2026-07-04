@@ -130,10 +130,8 @@ export default function LinkCard({
 
   return (
     <div
-      className={`group glass animate-fade-up rounded-[var(--radius-lg)] border p-4 shadow-[var(--shadow-sm)] transition-all duration-200 hover:-translate-y-px hover:border-brand-400/60 hover:glow-ring sm:p-5 ${
-        selected
-          ? "border-brand-400 bg-brand-50/60 glow-ring dark:bg-[color:var(--surface-muted)]"
-          : "border-border"
+      className={`group glass-card glass-hover animate-fade-up p-4 sm:p-5 ${
+        selected ? "!border-brand-400/70 glow-ring" : ""
       }`}
     >
       <div className="flex gap-3">

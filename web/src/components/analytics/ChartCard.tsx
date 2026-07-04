@@ -28,7 +28,7 @@ export default function ChartCard({
 }: ChartCardProps) {
   return (
     <section
-      className={`border-gradient glass animate-fade-up rounded-[var(--radius-lg)] p-4 shadow-[var(--shadow-sm)] sm:p-5 ${className}`}
+      className={`glass-card animate-fade-up p-4 sm:p-5 ${className}`}
     >
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
