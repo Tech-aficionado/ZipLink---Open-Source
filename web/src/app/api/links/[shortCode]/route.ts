@@ -1,11 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Timestamp } from 'firebase-admin/firestore';
-import {
-  getAuthFromRequest,
-  getFirestore,
-  AdminNotConfiguredError,
-  UnauthorizedError,
-} from '@/lib/firebaseAdmin';
+import { getAuthFromRequest, getFirestore } from '@/lib/firebaseAdmin';
+import { errorResponse } from '@/lib/http';
 
 export const runtime = 'nodejs';
 
@@ -48,16 +44,6 @@ function timestampToIso(value: Timestamp | null | undefined): string | null {
     return null;
   }
   return value.toDate().toISOString();
-}
-
-function errorResponse(error: unknown): NextResponse {
-  if (error instanceof UnauthorizedError) {
-    return NextResponse.json({ error: error.message }, { status: 401 });
-  }
-  if (error instanceof AdminNotConfiguredError) {
-    return NextResponse.json({ error: 'Firebase Admin not configured' }, { status: 503 });
-  }
-  return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
 }
 
 /**

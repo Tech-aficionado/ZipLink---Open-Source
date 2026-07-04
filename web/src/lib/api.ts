@@ -59,12 +59,23 @@ export function baseHostPrefix(): string {
 /** Client-side alias validation mirroring the server contract. */
 export const ALIAS_PATTERN = /^[a-zA-Z0-9_-]{3,32}$/;
 
+// Abort in-flight requests that hang longer than this so the UI never stalls
+// forever waiting on a dead connection.
+const REQUEST_TIMEOUT_MS = 15000;
+
 async function authHeaders(): Promise<HeadersInit> {
   const currentUser = auth.currentUser;
   if (!currentUser) {
     throw new ApiError("You must be signed in to do that.", 401);
   }
-  const token = await currentUser.getIdToken();
+  let token: string;
+  try {
+    token = await currentUser.getIdToken();
+  } catch {
+    // Token refresh can fail if the session was revoked or the device is
+    // offline. Normalize to an ApiError so callers handle it uniformly.
+    throw new ApiError("Couldn't verify your session. Please sign in again.", 401);
+  }
   return {
     Authorization: `Bearer ${token}`,
   };
@@ -81,6 +92,38 @@ async function parseError(response: Response): Promise<never> {
     // Response had no JSON body; fall back to the default message.
   }
   throw new ApiError(message, response.status);
+}
+
+/**
+ * Wraps `fetch` with a timeout and normalizes every low-level failure
+ * (offline, DNS, CORS, aborted/timed-out request) into an {@link ApiError}.
+ * This guarantees callers only ever catch an ApiError — never a raw
+ * `TypeError` — so their status-based branching (e.g. 503 handling) stays
+ * reliable. Non-2xx responses are converted via {@link parseError}. Returns
+ * the raw Response so the caller can read the body on success.
+ */
+async function request(path: string, init: RequestInit = {}): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(path, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (err instanceof ApiError) throw err;
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new ApiError("The request timed out. Please try again.", 0);
+    }
+    throw new ApiError("Network error. Check your connection and try again.", 0);
+  } finally {
+    clearTimeout(timer);
+  }
+
+  // 204 (No Content) is `ok`, so this correctly skips parseError for deletes.
+  if (!response.ok) {
+    await parseError(response);
+  }
+  return response;
 }
 
 /**
@@ -102,7 +145,7 @@ export async function createLink(
     payload.customCode = alias;
   }
 
-  const response = await fetch(`/api/links`, {
+  const response = await request(`/api/links`, {
     method: "POST",
     headers: {
       ...headers,
@@ -110,10 +153,6 @@ export async function createLink(
     },
     body: JSON.stringify(payload),
   });
-
-  if (!response.ok) {
-    await parseError(response);
-  }
 
   return (await response.json()) as CreateLinkResponse;
 }
@@ -123,14 +162,10 @@ export async function createLink(
  */
 export async function listLinks(): Promise<LinkItem[]> {
   const headers = await authHeaders();
-  const response = await fetch(`/api/links`, {
+  const response = await request(`/api/links`, {
     method: "GET",
     headers,
   });
-
-  if (!response.ok) {
-    await parseError(response);
-  }
 
   const data = (await response.json()) as ListLinksResponse;
   return data.links ?? [];
@@ -141,17 +176,10 @@ export async function listLinks(): Promise<LinkItem[]> {
  */
 export async function deleteLink(shortCode: string): Promise<void> {
   const headers = await authHeaders();
-  const response = await fetch(
-    `/api/links/${encodeURIComponent(shortCode)}`,
-    {
-      method: "DELETE",
-      headers,
-    },
-  );
-
-  if (!response.ok && response.status !== 204) {
-    await parseError(response);
-  }
+  await request(`/api/links/${encodeURIComponent(shortCode)}`, {
+    method: "DELETE",
+    headers,
+  });
 }
 
 /**
@@ -162,18 +190,11 @@ export async function updateLink(
   originalUrl: string,
 ): Promise<LinkItem> {
   const headers = await authHeaders();
-  const response = await fetch(
-    `/api/links/${encodeURIComponent(shortCode)}`,
-    {
-      method: "PATCH",
-      headers: { ...headers, "Content-Type": "application/json" },
-      body: JSON.stringify({ originalUrl }),
-    },
-  );
-
-  if (!response.ok) {
-    await parseError(response);
-  }
+  const response = await request(`/api/links/${encodeURIComponent(shortCode)}`, {
+    method: "PATCH",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ originalUrl }),
+  });
 
   return (await response.json()) as LinkItem;
 }
@@ -220,22 +241,16 @@ export interface LinkAnalytics {
 /** Account-wide analytics overview for the current user. */
 export async function getOverview(): Promise<OverviewAnalytics> {
   const headers = await authHeaders();
-  const response = await fetch(`/api/analytics/overview`, { headers });
-  if (!response.ok) {
-    await parseError(response);
-  }
+  const response = await request(`/api/analytics/overview`, { headers });
   return (await response.json()) as OverviewAnalytics;
 }
 
 /** Analytics for a single link owned by the current user. */
 export async function getLinkAnalytics(shortCode: string): Promise<LinkAnalytics> {
   const headers = await authHeaders();
-  const response = await fetch(
+  const response = await request(
     `/api/analytics/link/${encodeURIComponent(shortCode)}`,
     { headers },
   );
-  if (!response.ok) {
-    await parseError(response);
-  }
   return (await response.json()) as LinkAnalytics;
 }

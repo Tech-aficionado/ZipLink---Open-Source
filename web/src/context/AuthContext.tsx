@@ -31,10 +31,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
-      setUser(nextUser);
-      setLoading(false);
-    });
+    // The third arg is an error callback: if the auth observer itself fails
+    // (rare — e.g. a corrupted persistence state), don't leave the app stuck
+    // on the loading splash forever. Treat it as "signed out" and continue.
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      (nextUser) => {
+        setUser(nextUser);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("[auth] onAuthStateChanged error:", error);
+        setUser(null);
+        setLoading(false);
+      },
+    );
 
     return () => unsubscribe();
   }, []);

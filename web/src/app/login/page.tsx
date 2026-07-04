@@ -2,35 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FirebaseError } from "firebase/app";
 import { useAuth } from "@/context/AuthContext";
+import { authErrorMessage, isBenignAuthCancellation } from "@/lib/authErrors";
 import Button from "@/components/Button";
 import BrandSplash from "@/components/BrandSplash";
 import Logo from "@/components/Logo";
 import GoogleIcon from "@/components/GoogleIcon";
 import ThemeToggle from "@/components/ThemeToggle";
-
-function messageForError(error: unknown): string {
-  if (error instanceof FirebaseError) {
-    switch (error.code) {
-      case "auth/popup-closed-by-user":
-      case "auth/cancelled-popup-request":
-        return "The Google sign-in window was closed before finishing.";
-      case "auth/popup-blocked":
-        return "Your browser blocked the sign-in popup. Allow popups and try again.";
-      case "auth/network-request-failed":
-        return "Network error. Check your connection and try again.";
-      case "auth/too-many-requests":
-        return "Too many attempts. Please try again in a moment.";
-      case "auth/unauthorized-domain":
-        return "This domain isn't authorized for sign-in yet.";
-      default:
-        return error.message.replace("Firebase: ", "");
-    }
-  }
-  if (error instanceof Error) return error.message;
-  return "Something went wrong. Please try again.";
-}
 
 export default function LoginPage() {
   const { user, loading, signInWithGoogle } = useAuth();
@@ -49,7 +27,10 @@ export default function LoginPage() {
       await signInWithGoogle();
       router.replace("/dashboard");
     } catch (err) {
-      setError(messageForError(err));
+      // Closing the popup isn't a real error — just reset without alarming copy.
+      if (!isBenignAuthCancellation(err)) {
+        setError(authErrorMessage(err));
+      }
       setSubmitting(false);
     }
   };

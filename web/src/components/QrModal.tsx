@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import Button from "@/components/Button";
+import { useToast } from "@/context/ToastContext";
 import type { LinkItem } from "@/lib/api";
 
 interface QrModalProps {
@@ -21,6 +22,7 @@ function displayShort(shortUrl: string): string {
  * Closes on overlay click and on Escape.
  */
 export default function QrModal({ link, onClose }: QrModalProps) {
+  const toast = useToast();
   const [copied, setCopied] = useState(false);
   const canvasWrapRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -40,15 +42,23 @@ export default function QrModal({ link, onClose }: QrModalProps) {
   }, [onClose]);
 
   const handleDownload = () => {
-    const canvas = canvasWrapRef.current?.querySelector("canvas");
-    if (!canvas) return;
-    const dataUrl = canvas.toDataURL("image/png");
-    const anchor = document.createElement("a");
-    anchor.href = dataUrl;
-    anchor.download = `ziplink-${link.shortCode}.png`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
+    try {
+      const canvas = canvasWrapRef.current?.querySelector("canvas");
+      if (!canvas) {
+        toast.error("Couldn't find the QR code to download.");
+        return;
+      }
+      // toDataURL can throw (e.g. a tainted canvas or out-of-memory).
+      const dataUrl = canvas.toDataURL("image/png");
+      const anchor = document.createElement("a");
+      anchor.href = dataUrl;
+      anchor.download = `ziplink-${link.shortCode}.png`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+    } catch {
+      toast.error("Couldn't download the QR code. Try again.");
+    }
   };
 
   const handleCopy = async () => {
@@ -58,7 +68,7 @@ export default function QrModal({ link, onClose }: QrModalProps) {
       window.clearTimeout(copyTimer.current);
       copyTimer.current = window.setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Clipboard access can be denied; keep the UI calm.
+      toast.error("Couldn't copy — select the link and copy it manually.");
     }
   };
 
