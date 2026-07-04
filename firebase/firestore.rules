@@ -24,6 +24,14 @@ service cloud.firestore {
                             && request.auth.uid == resource.data.ownerUid;
     }
 
+    // `clicks` analytics events. Written only via the Admin SDK (which bypasses
+    // rules); the owner may read their own events. No direct client writes.
+    match /clicks/{clickId} {
+      allow read: if request.auth != null
+                  && request.auth.uid == resource.data.ownerUid;
+      allow write: if false;
+    }
+
     // Default deny: anything not explicitly matched above is rejected.
     match /{document=**} {
       allow read, write: if false;

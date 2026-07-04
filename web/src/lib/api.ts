@@ -177,3 +177,65 @@ export async function updateLink(
 
   return (await response.json()) as LinkItem;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Analytics                                                                  */
+/* -------------------------------------------------------------------------- */
+
+export interface Bucket {
+  label: string;
+  value: number;
+}
+export interface SeriesPoint {
+  date: string;
+  count: number;
+}
+export interface Analytics {
+  total: number;
+  last7: number;
+  last30: number;
+  series: SeriesPoint[];
+  devices: Bucket[];
+  browsers: Bucket[];
+  referrers: Bucket[];
+  countries: Bucket[];
+}
+export interface TopLink {
+  shortCode: string;
+  shortUrl: string;
+  originalUrl: string;
+  clicks: number;
+}
+export interface OverviewAnalytics {
+  totalLinks: number;
+  totalClicks: number;
+  topLinks: TopLink[];
+  analytics: Analytics;
+}
+export interface LinkAnalytics {
+  link: LinkItem;
+  analytics: Analytics;
+}
+
+/** Account-wide analytics overview for the current user. */
+export async function getOverview(): Promise<OverviewAnalytics> {
+  const headers = await authHeaders();
+  const response = await fetch(`/api/analytics/overview`, { headers });
+  if (!response.ok) {
+    await parseError(response);
+  }
+  return (await response.json()) as OverviewAnalytics;
+}
+
+/** Analytics for a single link owned by the current user. */
+export async function getLinkAnalytics(shortCode: string): Promise<LinkAnalytics> {
+  const headers = await authHeaders();
+  const response = await fetch(
+    `/api/analytics/link/${encodeURIComponent(shortCode)}`,
+    { headers },
+  );
+  if (!response.ok) {
+    await parseError(response);
+  }
+  return (await response.json()) as LinkAnalytics;
+}

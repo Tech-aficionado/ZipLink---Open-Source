@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getFirestore, AdminNotConfiguredError } from '@/lib/firebaseAdmin';
+import { parseUserAgent } from '@/lib/ua';
 
 export const runtime = 'nodejs';
 
 const LINKS_COLLECTION = 'links';
+const CLICKS_COLLECTION = 'clicks';
 
 interface RouteContext {
   params: Promise<{ shortCode: string }>;
@@ -12,27 +14,21 @@ interface RouteContext {
 
 interface LinkDocument {
   originalUrl: string;
+  ownerUid?: string;
 }
 
-// Short codes are nanoid values (alphabet: A-Za-z0-9_-). Anything outside this
-// shape can never exist as a document id, so we can reject it as 404 without
-// touching Firestore. This also avoids passing malformed ids (e.g. containing
-// slashes) into `.doc()`, which would throw.
+// Short codes are nanoid / custom-alias values. Anything else can't exist.
 const VALID_SHORT_CODE = /^[A-Za-z0-9_-]{1,64}$/;
 
 /**
  * GET /[shortCode]
- * PUBLIC endpoint (no auth). Looks up the link by id and issues a 301 redirect
- * to the original URL, incrementing the click count as a side effect.
- *
- * - Invalid/unknown code -> 404
- * - Admin not set up      -> 503
- * - Anything else         -> 500 (never leaks internal details)
+ * PUBLIC. Redirects to the original URL (301) and records a click event with
+ * lightweight, privacy-conscious metadata (device, browser, referrer host,
+ * country) for analytics.
  */
-export async function GET(_req: Request, ctx: RouteContext): Promise<NextResponse> {
+export async function GET(req: Request, ctx: RouteContext): Promise<NextResponse> {
   const { shortCode } = await ctx.params;
 
-  // Ignore obviously-invalid codes gracefully — treat as not found.
   if (typeof shortCode !== 'string' || !VALID_SHORT_CODE.test(shortCode)) {
     return new NextResponse('Not found', { status: 404 });
   }
@@ -60,15 +56,34 @@ export async function GET(_req: Request, ctx: RouteContext): Promise<NextRespons
       return new NextResponse('Not found', { status: 404 });
     }
 
-    // Record the visit. Awaited so the write is committed before we respond;
-    // failures here should not block the redirect.
-    try {
-      await docRef.update({
+    // Record the visit + a click event. Non-fatal: never block the redirect.
+    const ua = parseUserAgent(req.headers.get('user-agent'));
+    const ref = req.headers.get('referer');
+    const country =
+      req.headers.get('x-vercel-ip-country') ??
+      req.headers.get('cf-ipcountry') ??
+      null;
+
+    const writes: Promise<unknown>[] = [
+      docRef.update({
         clicks: FieldValue.increment(1),
         lastAccessedAt: FieldValue.serverTimestamp(),
-      });
+      }),
+      db.collection(CLICKS_COLLECTION).add({
+        shortCode,
+        ownerUid: data.ownerUid ?? null,
+        ts: FieldValue.serverTimestamp(),
+        ref: ref ?? null,
+        country,
+        device: ua.device,
+        browser: ua.browser,
+        os: ua.os,
+      }),
+    ];
+    try {
+      await Promise.allSettled(writes);
     } catch {
-      // Non-fatal: still redirect the user even if analytics update fails.
+      // ignore analytics write failures
     }
 
     return NextResponse.redirect(data.originalUrl, 301);
