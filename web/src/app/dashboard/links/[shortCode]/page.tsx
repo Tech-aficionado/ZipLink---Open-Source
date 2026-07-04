@@ -157,8 +157,9 @@ function LinkAnalyticsContent({
 
   return (
     <>
-      {/* Header */}
-      <section className="animate-fade-up">
+      {/* Header — glass hero */}
+      <section className="animate-fade-up glass-card glass-ring overflow-hidden p-5 sm:p-6">
+        <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1 brand-gradient" />
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -228,10 +229,8 @@ function LinkAnalyticsContent({
         </div>
       </section>
 
-      <div className="my-8 h-px w-full bg-border" />
-
       {/* Stats */}
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <section className="animate-fade-up mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard label="Total clicks" value={analytics.total} icon={<CursorGlyph />} />
         <StatCard label="Last 7 days" value={analytics.last7} icon={<CalendarGlyph />} />
         <StatCard label="Last 30 days" value={analytics.last30} icon={<CalendarGlyph />} />
@@ -280,9 +279,7 @@ function Panel({
   className?: string;
 }) {
   return (
-    <section
-      className={`animate-fade-up rounded-[var(--radius-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-sm)] ${className}`}
-    >
+    <section className={`animate-fade-up glass-card glass-hover p-5 ${className}`}>
       <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted">{title}</h2>
       {children}
     </section>
@@ -317,30 +314,30 @@ function StatePanel({
   children?: ReactNode;
 }) {
   return (
-    <div
-      className={`animate-fade-up rounded-[var(--radius-lg)] border border-dashed border-border-strong bg-surface p-12 text-center shadow-[var(--shadow-sm)] ${className}`}
-    >
-      <span
-        className={`mx-auto flex h-12 w-12 items-center justify-center rounded-full ${
-          tone === "warning"
-            ? "bg-[color:var(--danger-soft)] text-danger"
-            : "brand-gradient text-white"
-        }`}
-      >
-        {tone === "warning" ? (
-          <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M12 8.5v5M12 16.5h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-            <path d="M10.3 3.9 2.7 17a2 2 0 0 0 1.7 3h15.2a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-          </svg>
-        ) : (
-          <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M4 19V5M4 19h16M8 16l3.5-4 3 2.5L20 8" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        )}
-      </span>
-      <h3 className="mt-4 text-base font-semibold text-foreground">{title}</h3>
-      <p className="mx-auto mt-1 max-w-sm text-sm text-muted">{body}</p>
-      {children}
+    <div className={`animate-fade-up glass-card p-5 sm:p-6 ${className}`}>
+      <div className="flex flex-col items-center rounded-[var(--radius)] border border-dashed border-border-strong/70 px-6 py-10 text-center">
+        <span
+          className={`flex h-12 w-12 items-center justify-center rounded-full ${
+            tone === "warning"
+              ? "bg-[color:var(--danger-soft)] text-danger"
+              : "brand-gradient text-white"
+          }`}
+        >
+          {tone === "warning" ? (
+            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 8.5v5M12 16.5h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              <path d="M10.3 3.9 2.7 17a2 2 0 0 0 1.7 3h15.2a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+            </svg>
+          ) : (
+            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 19V5M4 19h16M8 16l3.5-4 3 2.5L20 8" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+        </span>
+        <h3 className="mt-4 text-base font-semibold text-foreground">{title}</h3>
+        <p className="mx-auto mt-1 max-w-sm text-sm text-muted">{body}</p>
+        {children}
+      </div>
     </div>
   );
 }

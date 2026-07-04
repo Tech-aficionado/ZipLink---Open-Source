@@ -208,7 +208,10 @@ export default function SettingsPage() {
         </Card>
 
         {/* Danger zone */}
-        <section className="animate-fade-up rounded-[var(--radius-lg)] border border-[color:var(--danger)] bg-surface p-5 shadow-[var(--shadow-sm)] sm:p-6">
+        <section
+          className="animate-fade-up glass-card p-5 sm:p-6"
+          style={{ borderColor: "var(--danger)" }}
+        >
           <div className="flex items-center gap-2">
             <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-[color:var(--danger-soft)] text-danger">
               <WarningGlyph />
@@ -268,7 +271,7 @@ function Card({
   children: ReactNode;
 }) {
   return (
-    <section className="animate-fade-up rounded-[var(--radius-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-sm)] sm:p-6">
+    <section className="animate-fade-up glass-card p-5 sm:p-6">
       <h2 className="text-base font-semibold text-foreground">{title}</h2>
       {description ? <p className="mt-0.5 text-sm text-muted">{description}</p> : null}
       <div className="mt-4">{children}</div>

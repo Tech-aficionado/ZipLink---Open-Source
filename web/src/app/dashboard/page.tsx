@@ -309,10 +309,13 @@ export default function LinksPage() {
 
   return (
     <>
-      {/* Create */}
-      <section className="animate-fade-up">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Shorten a link</h1>
-        <p className="mt-1 text-sm text-muted">Paste a long URL and get a clean, trackable Ziplink.</p>
+      {/* Create — page centerpiece */}
+      <section className="animate-fade-up glass-card glass-ring overflow-hidden p-6 sm:p-8">
+        <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1 brand-gradient" />
+        <h1 className="text-2xl font-semibold tracking-tight brand-text">Shorten a link</h1>
+        <p className="mt-1 text-sm text-muted">
+          Paste a long URL and get a clean, trackable Ziplink — ready to share in seconds.
+        </p>
 
         <form onSubmit={handleCreate} className="mt-5 flex flex-col gap-3" noValidate>
           <div className="flex flex-col gap-3 sm:flex-row">
@@ -365,7 +368,7 @@ export default function LinksPage() {
         ) : null}
 
         {lastCreated && !formError ? (
-          <div className="animate-fade-up mt-4 flex flex-col gap-3 rounded-[var(--radius-lg)] border border-brand-200 bg-brand-50 px-4 py-3.5 dark:border-brand-800 dark:bg-[color:var(--surface-muted)] sm:flex-row sm:items-center sm:justify-between">
+          <div className="animate-fade-up mt-4 flex flex-col gap-3 rounded-[var(--radius-lg)] border border-brand-200/70 bg-[color:color-mix(in_srgb,var(--brand-500)_12%,transparent)] px-4 py-3.5 backdrop-blur-sm dark:border-brand-800/70 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <p className="text-xs font-medium uppercase tracking-wide text-brand-600 dark:text-brand-300">
                 Your short link is ready
@@ -389,7 +392,7 @@ export default function LinksPage() {
       <div className="my-9 h-px w-full bg-border" />
 
       {showList ? (
-        <section className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <section className="animate-fade-up mb-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <StatCard label="Total links" value={links.length} icon={<LinkGlyph />} />
           <StatCard label="Total clicks" value={totalClicks} icon={<CursorGlyph />} />
           {topLink ? (
@@ -447,7 +450,7 @@ export default function LinksPage() {
         ) : backendUnavailable ? (
           <EmptyPanel title="Almost there" body={BACKEND_UNCONFIGURED_MESSAGE} tone="warning" />
         ) : listError ? (
-          <div className="rounded-[var(--radius-lg)] border border-border bg-surface p-10 text-center shadow-[var(--shadow-sm)]">
+          <div className="animate-fade-up glass-card p-10 text-center">
             <p className="text-sm text-danger">{listError}</p>
             <div className="mt-4 flex justify-center">
               <Button variant="secondary" size="sm" onClick={loadLinks}>Try again</Button>
@@ -613,25 +616,27 @@ function EmptyPanel({
   tone?: "neutral" | "warning";
 }) {
   return (
-    <div className="animate-fade-up rounded-[var(--radius-lg)] border border-dashed border-border-strong bg-surface p-12 text-center shadow-[var(--shadow-sm)]">
-      <span
-        className={`mx-auto flex h-12 w-12 items-center justify-center rounded-full ${
-          tone === "warning" ? "bg-[color:var(--danger-soft)] text-danger" : "brand-gradient text-white"
-        }`}
-      >
-        {tone === "warning" ? (
-          <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M12 8.5v5M12 16.5h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-            <path d="M10.3 3.9 2.7 17a2 2 0 0 0 1.7 3h15.2a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-          </svg>
-        ) : (
-          <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M9 15l6-6M10.5 6.5l1-1a4 4 0 0 1 5.6 5.6l-2 2M13.5 17.5l-1 1a4 4 0 0 1-5.6-5.6l2-2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        )}
-      </span>
-      <h3 className="mt-4 text-base font-semibold text-foreground">{title}</h3>
-      <p className="mx-auto mt-1 max-w-sm text-sm text-muted">{body}</p>
+    <div className="animate-fade-up glass-card p-5 sm:p-6">
+      <div className="flex flex-col items-center rounded-[var(--radius)] border border-dashed border-border-strong/70 px-6 py-10 text-center">
+        <span
+          className={`flex h-12 w-12 items-center justify-center rounded-full ${
+            tone === "warning" ? "bg-[color:var(--danger-soft)] text-danger" : "brand-gradient text-white"
+          }`}
+        >
+          {tone === "warning" ? (
+            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 8.5v5M12 16.5h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              <path d="M10.3 3.9 2.7 17a2 2 0 0 0 1.7 3h15.2a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+            </svg>
+          ) : (
+            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M9 15l6-6M10.5 6.5l1-1a4 4 0 0 1 5.6 5.6l-2 2M13.5 17.5l-1 1a4 4 0 0 1-5.6-5.6l2-2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+        </span>
+        <h3 className="mt-4 text-base font-semibold text-foreground">{title}</h3>
+        <p className="mx-auto mt-1 max-w-sm text-sm text-muted">{body}</p>
+      </div>
     </div>
   );
 }

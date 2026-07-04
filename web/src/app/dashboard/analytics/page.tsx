@@ -230,25 +230,27 @@ function TopLinksList({ links }: { links: OverviewAnalytics["topLinks"] }) {
 
 function EmptyState() {
   return (
-    <div className="animate-fade-up rounded-[var(--radius-lg)] border border-dashed border-border-strong bg-surface p-12 text-center shadow-[var(--shadow-sm)]">
-      <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full brand-gradient text-white">
-        <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path
-            d="M4 19V5m0 14h16M8 15l3.5-4 3 2.5L20 8"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </span>
-      <h3 className="mt-4 text-base font-semibold text-foreground">
-        No clicks yet
-      </h3>
-      <p className="mx-auto mt-1 max-w-sm text-sm text-muted">
-        Share a link to start seeing analytics. Your clicks, devices, and top
-        countries will show up here.
-      </p>
+    <div className="animate-fade-up glass-card p-5 sm:p-6">
+      <div className="flex flex-col items-center rounded-[var(--radius)] border border-dashed border-border-strong/70 px-6 py-10 text-center">
+        <span className="flex h-12 w-12 items-center justify-center rounded-full brand-gradient text-white">
+          <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              d="M4 19V5m0 14h16M8 15l3.5-4 3 2.5L20 8"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </span>
+        <h3 className="mt-4 text-base font-semibold text-foreground">
+          No clicks yet
+        </h3>
+        <p className="mx-auto mt-1 max-w-sm text-sm text-muted">
+          Share a link to start seeing analytics. Your clicks, devices, and top
+          countries will show up here.
+        </p>
+      </div>
     </div>
   );
 }
@@ -263,47 +265,49 @@ function AnalyticsError({
   onRetry: () => void;
 }) {
   return (
-    <div className="animate-fade-up rounded-[var(--radius-lg)] border border-dashed border-border-strong bg-surface p-12 text-center shadow-[var(--shadow-sm)]">
-      <span
-        className={`mx-auto flex h-12 w-12 items-center justify-center rounded-full ${
-          unconfigured
-            ? "brand-gradient text-white"
-            : "bg-[color:var(--danger-soft)] text-danger"
-        }`}
-      >
-        {unconfigured ? (
-          <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path
-              d="M4 19V5m0 14h16M8 15l3.5-4 3 2.5L20 8"
-              stroke="currentColor"
-              strokeWidth="1.7"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        ) : (
-          <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M12 8.5v5M12 16.5h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-            <path
-              d="M10.3 3.9 2.7 17a2 2 0 0 0 1.7 3h15.2a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinejoin="round"
-            />
-          </svg>
-        )}
-      </span>
-      <h3 className="mt-4 text-base font-semibold text-foreground">
-        {unconfigured ? "Almost there" : "Couldn't load analytics"}
-      </h3>
-      <p className="mx-auto mt-1 max-w-sm text-sm text-muted">{message}</p>
-      {!unconfigured ? (
-        <div className="mt-5 flex justify-center">
-          <Button variant="secondary" size="sm" onClick={onRetry}>
-            Try again
-          </Button>
-        </div>
-      ) : null}
+    <div className="animate-fade-up glass-card p-5 sm:p-6">
+      <div className="flex flex-col items-center rounded-[var(--radius)] border border-dashed border-border-strong/70 px-6 py-10 text-center">
+        <span
+          className={`flex h-12 w-12 items-center justify-center rounded-full ${
+            unconfigured
+              ? "brand-gradient text-white"
+              : "bg-[color:var(--danger-soft)] text-danger"
+          }`}
+        >
+          {unconfigured ? (
+            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M4 19V5m0 14h16M8 15l3.5-4 3 2.5L20 8"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          ) : (
+            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 8.5v5M12 16.5h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              <path
+                d="M10.3 3.9 2.7 17a2 2 0 0 0 1.7 3h15.2a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
+        </span>
+        <h3 className="mt-4 text-base font-semibold text-foreground">
+          {unconfigured ? "Almost there" : "Couldn't load analytics"}
+        </h3>
+        <p className="mx-auto mt-1 max-w-sm text-sm text-muted">{message}</p>
+        {!unconfigured ? (
+          <div className="mt-5 flex justify-center">
+            <Button variant="secondary" size="sm" onClick={onRetry}>
+              Try again
+            </Button>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -313,27 +317,21 @@ function AnalyticsSkeleton() {
     <div className="space-y-6" aria-hidden="true">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div
-            key={i}
-            className="rounded-[var(--radius-lg)] border border-border bg-surface p-4 shadow-[var(--shadow-sm)] sm:p-5"
-          >
+          <div key={i} className="glass-card p-4 sm:p-5">
             <Skeleton className="h-3 w-20" />
             <Skeleton className="mt-3 h-7 w-16" />
           </div>
         ))}
       </div>
 
-      <div className="rounded-[var(--radius-lg)] border border-border bg-surface p-4 shadow-[var(--shadow-sm)] sm:p-5">
+      <div className="glass-card p-4 sm:p-5">
         <Skeleton className="h-3 w-32" />
         <Skeleton className="mt-4 h-[200px] w-full" />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div
-            key={i}
-            className="rounded-[var(--radius-lg)] border border-border bg-surface p-4 shadow-[var(--shadow-sm)] sm:p-5"
-          >
+          <div key={i} className="glass-card p-4 sm:p-5">
             <Skeleton className="h-3 w-24" />
             <Skeleton className="mt-4 h-32 w-full" />
           </div>
