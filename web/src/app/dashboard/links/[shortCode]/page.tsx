@@ -166,7 +166,7 @@ function LinkAnalyticsContent({
                 href={link.shortUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="truncate rounded-sm font-mono text-lg font-semibold brand-text hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+                className="min-w-0 truncate rounded-sm font-mono text-base font-semibold brand-text hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 sm:text-lg"
               >
                 {displayShort(link.shortUrl)}
               </a>
