@@ -27,7 +27,11 @@ export default function HowItWorks() {
     <section id="how-it-works" className="scroll-mt-20">
       <div className="mx-auto w-full max-w-6xl px-5 py-20 sm:px-8 sm:py-24">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+          <span className="inline-flex items-center gap-2 rounded-full border border-border-strong bg-surface/60 px-3 py-1 text-xs font-medium text-muted-strong backdrop-blur">
+            <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--cyan)]" />
+            How it works
+          </span>
+          <h2 className="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">
             Live in <span className="brand-text-2">three steps</span>
           </h2>
           <p className="mt-4 text-base text-muted-strong">

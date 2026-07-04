@@ -1,21 +1,61 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/Button";
 import { useAuth } from "@/context/AuthContext";
 import TransformDemo from "@/components/landing/TransformDemo";
 import LinkboltMark from "@/components/LinkboltMark";
+import usePrefersReducedMotion from "@/hooks/usePrefersReducedMotion";
+
+/** Illustrative long-URL → short-link pairs the hero visual cycles through. */
+const DEMO_PAIRS: readonly { longUrl: string; alias: string }[] = [
+  {
+    longUrl:
+      "https://example.com/articles/2025/futuristic-url-shortening?ref=launch&utm=hero",
+    alias: "launch",
+  },
+  {
+    longUrl:
+      "https://shop.example.com/collections/summer/products/neon-runner?variant=42&utm_source=ig",
+    alias: "neon",
+  },
+  {
+    longUrl:
+      "https://docs.example.com/guides/getting-started/quickstart?section=install&v=2",
+    alias: "docs",
+  },
+  {
+    longUrl:
+      "https://open.example.fm/playlist/late-night-coding-mix-2025?si=abc123&t=0",
+    alias: "mix",
+  },
+];
 
 /**
  * Hero: balanced gradient headline, subcopy, primary + secondary CTAs, and the
- * live transform visual. Backed by a grid + glow + orb accent layer.
+ * live transform visual. The visual auto-rotates through a few example pairs so
+ * the hero feels dynamic. Backed by a grid + glow + orb accent layer.
  */
 export default function Hero() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const reduced = usePrefersReducedMotion();
+  const [pairIndex, setPairIndex] = useState(0);
 
   const isAuthed = !loading && Boolean(user);
   const primaryHref = isAuthed ? "/dashboard" : "/login";
+
+  useEffect(() => {
+    // Decorative auto-rotation; skip entirely when the user opts out of motion.
+    if (reduced) return;
+    const id = window.setInterval(() => {
+      setPairIndex((current) => (current + 1) % DEMO_PAIRS.length);
+    }, 3200);
+    return () => window.clearInterval(id);
+  }, [reduced]);
+
+  const pair = DEMO_PAIRS[pairIndex];
 
   return (
     <section className="glow relative overflow-hidden">
@@ -60,6 +100,7 @@ export default function Hero() {
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
             <Button
               size="lg"
+              className="w-full sm:w-auto"
               onClick={() => router.push(primaryHref)}
             >
               Get started — it&apos;s free
@@ -67,6 +108,7 @@ export default function Hero() {
             <Button
               size="lg"
               variant="ghost"
+              className="w-full sm:w-auto"
               onClick={() => {
                 document
                   .getElementById("features")
@@ -83,8 +125,15 @@ export default function Hero() {
         </div>
 
         <div className="flex min-w-0 justify-center lg:justify-end">
-          <div className="animate-float w-full max-w-md min-w-0">
-            <TransformDemo />
+          <div
+            className="animate-float w-full max-w-md min-w-0"
+            aria-hidden="true"
+          >
+            <TransformDemo
+              key={pairIndex}
+              longUrl={pair.longUrl}
+              alias={pair.alias}
+            />
           </div>
         </div>
       </div>
