@@ -1,20 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { ToastProvider, useToast } from "@/context/ToastContext";
-import Toaster from "@/components/Toaster";
+import { useToast } from "@/context/ToastContext";
 import Button from "@/components/Button";
-import BrandSplash from "@/components/BrandSplash";
-import Logo from "@/components/Logo";
-import ThemeToggle from "@/components/ThemeToggle";
 import LinkCard from "@/components/LinkCard";
 import { LinkCardSkeleton } from "@/components/Skeleton";
 import QrModal from "@/components/QrModal";
 import EditLinkModal from "@/components/EditLinkModal";
 import StatCard from "@/components/StatCard";
 import SearchInput from "@/components/SearchInput";
+import BulkActionBar from "@/components/BulkActionBar";
+import { downloadCsv, linksToCsv } from "@/lib/csv";
 import {
   ALIAS_PATTERN,
   ApiError,
@@ -25,29 +22,19 @@ import {
   type LinkItem,
 } from "@/lib/api";
 
+const CSV_FILENAME = "ziplink-links.csv";
 const ALIAS_HELP = "optional — 3–32 letters, numbers, - or _";
-
 const BACKEND_UNCONFIGURED_MESSAGE =
   "Server not fully configured yet — add the Firebase service account key to start creating links.";
 
 type SortKey = "newest" | "oldest" | "clicks";
 
-/**
- * Page shell: provides toast context to the whole dashboard tree and renders
- * the Toaster alongside the workspace.
- */
-export default function DashboardPage() {
-  return (
-    <ToastProvider>
-      <DashboardWorkspace />
-      <Toaster />
-    </ToastProvider>
-  );
+function pluralizeLinks(count: number): string {
+  return count === 1 ? "link" : "links";
 }
 
-function DashboardWorkspace() {
-  const { user, loading, signOutUser } = useAuth();
-  const router = useRouter();
+export default function LinksPage() {
+  const { user } = useAuth();
   const toast = useToast();
 
   const [links, setLinks] = useState<LinkItem[]>([]);
@@ -68,12 +55,9 @@ function DashboardWorkspace() {
   const [sort, setSort] = useState<SortKey>("newest");
   const [qrLink, setQrLink] = useState<LinkItem | null>(null);
   const [editLink, setEditLink] = useState<LinkItem | null>(null);
+  const [selectedCodes, setSelectedCodes] = useState<Set<string>>(() => new Set());
 
   const aliasPrefix = baseHostPrefix();
-
-  useEffect(() => {
-    if (!loading && !user) router.replace("/login");
-  }, [user, loading, router]);
 
   useEffect(() => {
     return () => window.clearTimeout(copyTimer.current);
@@ -110,6 +94,21 @@ function DashboardWorkspace() {
   useEffect(() => {
     if (user) void loadLinks();
   }, [user, loadLinks]);
+
+  // Keep the selection in sync with the links that actually exist.
+  useEffect(() => {
+    setSelectedCodes((prev) => {
+      if (prev.size === 0) return prev;
+      const valid = new Set(links.map((item) => item.shortCode));
+      let changed = false;
+      const next = new Set<string>();
+      prev.forEach((code) => {
+        if (valid.has(code)) next.add(code);
+        else changed = true;
+      });
+      return changed ? next : prev;
+    });
+  }, [links]);
 
   const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -157,15 +156,9 @@ function DashboardWorkspace() {
       toast.success("Short link created");
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.status === 503) {
-          setFormError(BACKEND_UNCONFIGURED_MESSAGE);
-        } else if (err.status === 409) {
-          setFormError("That alias is already taken.");
-        } else {
-          // 400 (invalid/reserved alias) and other API errors surface the
-          // server-provided message.
-          setFormError(err.message);
-        }
+        if (err.status === 503) setFormError(BACKEND_UNCONFIGURED_MESSAGE);
+        else if (err.status === 409) setFormError("That alias is already taken.");
+        else setFormError(err.message);
       } else if (err instanceof Error) {
         setFormError(err.message);
       } else {
@@ -194,22 +187,14 @@ function DashboardWorkspace() {
       try {
         await deleteLink(shortCode);
         setLinks((prev) => prev.filter((item) => item.shortCode !== shortCode));
-        setLastCreated((prev) =>
-          prev && prev.shortCode === shortCode ? null : prev,
-        );
+        setLastCreated((prev) => (prev && prev.shortCode === shortCode ? null : prev));
         setQrLink((prev) => (prev && prev.shortCode === shortCode ? null : prev));
-        setEditLink((prev) =>
-          prev && prev.shortCode === shortCode ? null : prev,
-        );
+        setEditLink((prev) => (prev && prev.shortCode === shortCode ? null : prev));
         toast.success("Link deleted");
       } catch (err) {
-        if (err instanceof ApiError && err.status === 503) {
-          toast.error(BACKEND_UNCONFIGURED_MESSAGE);
-        } else if (err instanceof Error) {
-          toast.error(err.message);
-        } else {
-          toast.error("Failed to delete that link.");
-        }
+        if (err instanceof ApiError && err.status === 503) toast.error(BACKEND_UNCONFIGURED_MESSAGE);
+        else if (err instanceof Error) toast.error(err.message);
+        else toast.error("Failed to delete that link.");
       }
     },
     [toast],
@@ -218,33 +203,23 @@ function DashboardWorkspace() {
   const handleUpdated = useCallback(
     (updated: LinkItem) => {
       setLinks((prev) =>
-        prev.map((item) =>
-          item.shortCode === updated.shortCode ? { ...item, ...updated } : item,
-        ),
+        prev.map((item) => (item.shortCode === updated.shortCode ? { ...item, ...updated } : item)),
       );
       setLastCreated((prev) =>
-        prev && prev.shortCode === updated.shortCode
-          ? { ...prev, ...updated }
-          : prev,
+        prev && prev.shortCode === updated.shortCode ? { ...prev, ...updated } : prev,
       );
       toast.success("Destination updated");
     },
     [toast],
   );
 
-  const handleSignOut = async () => {
-    await signOutUser();
-    router.replace("/login");
-  };
-
-  // Summary stats derived from the loaded links.
+  // Derived data.
   const totalClicks = links.reduce((sum, item) => sum + item.clicks, 0);
   const topLink = links.reduce<LinkItem | null>(
     (best, item) => (!best || item.clicks > best.clicks ? item : best),
     null,
   );
 
-  // Client-side search over shortCode + originalUrl (case-insensitive).
   const query = search.trim().toLowerCase();
   const filteredLinks = query
     ? links.filter(
@@ -253,270 +228,290 @@ function DashboardWorkspace() {
           item.originalUrl.toLowerCase().includes(query),
       )
     : links;
-
   const sortedLinks = sortLinks(filteredLinks, sort);
 
-  const showList =
-    !listLoading && !backendUnavailable && !listError && links.length > 0;
+  const showList = !listLoading && !backendUnavailable && !listError && links.length > 0;
 
-  if (loading || !user) {
-    return <BrandSplash label="Loading your workspace…" />;
-  }
+  const selectedVisible = sortedLinks.filter((item) => selectedCodes.has(item.shortCode));
+  const selectedCount = selectedVisible.length;
+  const allVisibleSelected = sortedLinks.length > 0 && selectedCount === sortedLinks.length;
+  const someVisibleSelected = selectedCount > 0 && !allVisibleSelected;
 
-  const initial = (user.displayName || user.email || "?").charAt(0).toUpperCase();
+  const toggleSelect = (shortCode: string) => {
+    setSelectedCodes((prev) => {
+      const next = new Set(prev);
+      if (next.has(shortCode)) next.delete(shortCode);
+      else next.add(shortCode);
+      return next;
+    });
+  };
+
+  const toggleSelectAllVisible = () => {
+    setSelectedCodes((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) sortedLinks.forEach((item) => next.delete(item.shortCode));
+      else sortedLinks.forEach((item) => next.add(item.shortCode));
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedCodes(new Set());
+
+  const handleExportAll = () => {
+    if (links.length === 0) return;
+    downloadCsv(CSV_FILENAME, linksToCsv(links));
+    toast.success(`Exported ${links.length} ${pluralizeLinks(links.length)}`);
+  };
+
+  const handleExportSelected = () => {
+    if (selectedVisible.length === 0) return;
+    downloadCsv(CSV_FILENAME, linksToCsv(selectedVisible));
+    toast.success(`Exported ${selectedVisible.length} ${pluralizeLinks(selectedVisible.length)}`);
+  };
+
+  const handleDeleteSelected = async () => {
+    const codes = selectedVisible.map((item) => item.shortCode);
+    if (codes.length === 0) return;
+
+    const results = await Promise.allSettled(
+      codes.map((code) => Promise.resolve(deleteLink(code))),
+    );
+
+    const deleted: string[] = [];
+    let failed = 0;
+    let backendDown = false;
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled") deleted.push(codes[index]);
+      else {
+        failed += 1;
+        if (result.reason instanceof ApiError && result.reason.status === 503) backendDown = true;
+      }
+    });
+
+    if (deleted.length > 0) {
+      const removed = new Set(deleted);
+      setLinks((prev) => prev.filter((item) => !removed.has(item.shortCode)));
+      setLastCreated((prev) => (prev && removed.has(prev.shortCode) ? null : prev));
+      setQrLink((prev) => (prev && removed.has(prev.shortCode) ? null : prev));
+      setEditLink((prev) => (prev && removed.has(prev.shortCode) ? null : prev));
+      setSelectedCodes((prev) => {
+        const next = new Set(prev);
+        deleted.forEach((code) => next.delete(code));
+        return next;
+      });
+    }
+
+    if (failed === 0) toast.success(`Deleted ${deleted.length} ${pluralizeLinks(deleted.length)}`);
+    else if (deleted.length === 0)
+      toast.error(backendDown ? BACKEND_UNCONFIGURED_MESSAGE : `Couldn't delete ${failed} ${pluralizeLinks(failed)}`);
+    else toast.error(`Deleted ${deleted.length}, ${failed} failed`);
+  };
 
   return (
-    <div className="flex min-h-dvh flex-1 flex-col bg-background">
-      {/* Nav */}
-      <header className="sticky top-0 z-20 border-b border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <Logo />
-          <div className="flex items-center gap-1.5 sm:gap-3">
-            <ThemeToggle />
-            <div className="flex items-center gap-2 rounded-full border border-border bg-surface p-1 sm:pr-3">
-              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full brand-gradient text-xs font-semibold text-white">
-                {initial}
-              </span>
-              <span className="hidden max-w-[12rem] truncate text-sm text-muted-strong sm:inline">
-                {user.email}
-              </span>
-            </div>
-            <Button variant="ghost" size="sm" onClick={handleSignOut}>
-              Sign out
+    <>
+      {/* Create */}
+      <section className="animate-fade-up">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Shorten a link</h1>
+        <p className="mt-1 text-sm text-muted">Paste a long URL and get a clean, trackable Ziplink.</p>
+
+        <form onSubmit={handleCreate} className="mt-5 flex flex-col gap-3" noValidate>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <input
+              ref={urlInputRef}
+              type="url"
+              inputMode="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://example.com/a-very-long-link-to-shorten"
+              aria-label="URL to shorten"
+              aria-invalid={formError ? true : undefined}
+              className="zip-field flex-1"
+            />
+            <Button type="submit" size="lg" loading={creating} className="w-full sm:w-40">
+              {creating ? "Shortening" : "Shorten link"}
             </Button>
           </div>
-        </div>
-      </header>
 
-      <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-6 sm:py-12">
-        {/* Create */}
-        <section className="animate-fade-up">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Shorten a link
-          </h1>
-          <p className="mt-1 text-sm text-muted">
-            Paste a long URL and get a clean, trackable Ziplink.
-          </p>
-
-          <form onSubmit={handleCreate} className="mt-5 flex flex-col gap-3" noValidate>
-            <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-stretch">
+              <span
+                className="inline-flex shrink-0 items-center rounded-l-[var(--radius)] border border-r-0 border-border-strong bg-surface-muted px-3 font-mono text-xs text-muted"
+                aria-hidden="true"
+              >
+                {aliasPrefix}
+              </span>
               <input
-                ref={urlInputRef}
-                type="url"
-                inputMode="url"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://example.com/a-very-long-link-to-shorten"
-                aria-label="URL to shorten"
-                aria-invalid={formError ? true : undefined}
-                className="zip-field flex-1"
+                type="text"
+                value={alias}
+                onChange={(e) => setAlias(e.target.value)}
+                placeholder="custom-alias"
+                aria-label="Custom alias (optional)"
+                aria-describedby="alias-help"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                maxLength={32}
+                className="zip-field min-w-0 flex-1 rounded-l-none font-mono"
               />
-              <Button type="submit" size="lg" loading={creating} className="w-full sm:w-40">
-                {creating ? "Shortening" : "Shorten link"}
-              </Button>
             </div>
+            <p id="alias-help" className="text-xs text-muted">{ALIAS_HELP}</p>
+          </div>
+        </form>
 
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-stretch">
-                <span
-                  className="inline-flex shrink-0 items-center rounded-l-[var(--radius)] border border-r-0 border-border-strong bg-surface-muted px-3 font-mono text-xs text-muted"
-                  aria-hidden="true"
-                >
-                  {aliasPrefix}
-                </span>
-                <input
-                  type="text"
-                  value={alias}
-                  onChange={(e) => setAlias(e.target.value)}
-                  placeholder="custom-alias"
-                  aria-label="Custom alias (optional)"
-                  aria-describedby="alias-help"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  maxLength={32}
-                  className="zip-field min-w-0 flex-1 rounded-l-none font-mono"
-                />
-              </div>
-              <p id="alias-help" className="text-xs text-muted">
-                {ALIAS_HELP}
-              </p>
-            </div>
-          </form>
-
-          {formError ? (
-            <p role="alert" className="mt-3 rounded-[var(--radius)] bg-[color:var(--danger-soft)] px-3 py-2.5 text-sm text-danger">
-              {formError}
-            </p>
-          ) : null}
-
-          {lastCreated && !formError ? (
-            <div className="animate-fade-up mt-4 flex flex-col gap-3 rounded-[var(--radius-lg)] border border-brand-200 bg-brand-50 px-4 py-3.5 dark:border-brand-800 dark:bg-[color:var(--surface-muted)] sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <p className="text-xs font-medium uppercase tracking-wide text-brand-600 dark:text-brand-300">
-                  Your short link is ready
-                </p>
-                <a
-                  href={lastCreated.shortUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-0.5 block truncate font-mono text-sm font-semibold text-foreground hover:underline"
-                >
-                  {lastCreated.shortUrl}
-                </a>
-              </div>
-              <Button variant="primary" size="sm" onClick={handleCopyCreated} className="shrink-0">
-                {copied ? "Copied!" : "Copy link"}
-              </Button>
-            </div>
-          ) : null}
-        </section>
-
-        {/* Divider */}
-        <div className="my-9 h-px w-full bg-border" />
-
-        {/* Summary stats — only once links have loaded and exist. */}
-        {showList ? (
-          <section className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <StatCard
-              label="Total links"
-              value={links.length}
-              icon={<LinkGlyph />}
-            />
-            <StatCard
-              label="Total clicks"
-              value={totalClicks}
-              icon={<CursorGlyph />}
-            />
-            {topLink ? (
-              <StatCard
-                label="Top link"
-                value={displayShortCode(topLink.shortUrl)}
-                hint={`${topLink.clicks} ${topLink.clicks === 1 ? "click" : "clicks"}`}
-                icon={<TrophyGlyph />}
-              />
-            ) : null}
-          </section>
+        {formError ? (
+          <p role="alert" className="mt-3 rounded-[var(--radius)] bg-[color:var(--danger-soft)] px-3 py-2.5 text-sm text-danger">
+            {formError}
+          </p>
         ) : null}
 
-        {/* Links */}
-        <section>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
-                Your links
-              </h2>
-              {showList ? (
-                <span className="rounded-full bg-surface-muted px-2.5 py-0.5 text-xs font-medium text-muted-strong tabular-nums">
-                  {links.length} {links.length === 1 ? "link" : "links"}
-                </span>
-              ) : null}
+        {lastCreated && !formError ? (
+          <div className="animate-fade-up mt-4 flex flex-col gap-3 rounded-[var(--radius-lg)] border border-brand-200 bg-brand-50 px-4 py-3.5 dark:border-brand-800 dark:bg-[color:var(--surface-muted)] sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-medium uppercase tracking-wide text-brand-600 dark:text-brand-300">
+                Your short link is ready
+              </p>
+              <a
+                href={lastCreated.shortUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-0.5 block truncate font-mono text-sm font-semibold text-foreground hover:underline"
+              >
+                {lastCreated.shortUrl}
+              </a>
             </div>
+            <Button variant="primary" size="sm" onClick={handleCopyCreated} className="shrink-0">
+              {copied ? "Copied!" : "Copy link"}
+            </Button>
+          </div>
+        ) : null}
+      </section>
+
+      <div className="my-9 h-px w-full bg-border" />
+
+      {showList ? (
+        <section className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <StatCard label="Total links" value={links.length} icon={<LinkGlyph />} />
+          <StatCard label="Total clicks" value={totalClicks} icon={<CursorGlyph />} />
+          {topLink ? (
+            <StatCard
+              label="Top link"
+              value={displayShortCode(topLink.shortUrl)}
+              hint={`${topLink.clicks} ${topLink.clicks === 1 ? "click" : "clicks"}`}
+              icon={<TrophyGlyph />}
+            />
+          ) : null}
+        </section>
+      ) : null}
+
+      <section>
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Your links</h2>
             {showList ? (
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-                <div className="sm:w-56">
-                  <SearchInput
-                    value={search}
-                    onChange={setSearch}
-                    placeholder="Search by code or URL…"
-                  />
-                </div>
-                <SortSelect value={sort} onChange={setSort} />
-              </div>
+              <span className="rounded-full bg-surface-muted px-2.5 py-0.5 text-xs font-medium text-muted-strong tabular-nums">
+                {links.length} {pluralizeLinks(links.length)}
+              </span>
             ) : null}
           </div>
-
-          {listLoading ? (
-            <div className="space-y-3">
-              <LinkCardSkeleton />
-              <LinkCardSkeleton />
-              <LinkCardSkeleton />
-            </div>
-          ) : backendUnavailable ? (
-            <EmptyPanel title="Almost there" body={BACKEND_UNCONFIGURED_MESSAGE} tone="warning" />
-          ) : listError ? (
-            <div className="rounded-[var(--radius-lg)] border border-border bg-surface p-10 text-center shadow-[var(--shadow-sm)]">
-              <p className="text-sm text-danger">{listError}</p>
-              <div className="mt-4 flex justify-center">
-                <Button variant="secondary" size="sm" onClick={loadLinks}>
-                  Try again
-                </Button>
+          {showList ? (
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+              <div className="sm:w-56">
+                <SearchInput value={search} onChange={setSearch} placeholder="Search by code or URL…" />
               </div>
+              <SortSelect value={sort} onChange={setSort} />
             </div>
-          ) : links.length === 0 ? (
-            <EmptyPanel title="No links yet" body="Paste a URL above to create your first Ziplink." />
-          ) : sortedLinks.length === 0 ? (
-            <EmptyPanel
-              title="No links match"
-              body={`Nothing matches “${search.trim()}”. Try a different search.`}
+          ) : null}
+        </div>
+
+        {showList && sortedLinks.length > 0 ? (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <SelectAllControl
+              checked={allVisibleSelected}
+              indeterminate={someVisibleSelected}
+              onChange={toggleSelectAllVisible}
+              count={sortedLinks.length}
             />
-          ) : (
-            <div className="space-y-3">
-              {sortedLinks.map((link) => (
-                <LinkCard
-                  key={link.shortCode}
-                  link={link}
-                  onDelete={handleDelete}
-                  onShowQr={setQrLink}
-                  onEdit={setEditLink}
-                  onCopied={() => toast.success("Link copied to clipboard")}
-                  onCopyError={() =>
-                    toast.error("Couldn't copy the link to your clipboard.")
-                  }
-                />
-              ))}
+            <Button variant="secondary" size="sm" onClick={handleExportAll}>
+              <DownloadGlyph />
+              Export all
+            </Button>
+          </div>
+        ) : null}
+
+        {listLoading ? (
+          <div className="space-y-3">
+            <LinkCardSkeleton />
+            <LinkCardSkeleton />
+            <LinkCardSkeleton />
+          </div>
+        ) : backendUnavailable ? (
+          <EmptyPanel title="Almost there" body={BACKEND_UNCONFIGURED_MESSAGE} tone="warning" />
+        ) : listError ? (
+          <div className="rounded-[var(--radius-lg)] border border-border bg-surface p-10 text-center shadow-[var(--shadow-sm)]">
+            <p className="text-sm text-danger">{listError}</p>
+            <div className="mt-4 flex justify-center">
+              <Button variant="secondary" size="sm" onClick={loadLinks}>Try again</Button>
             </div>
-          )}
-        </section>
-      </main>
+          </div>
+        ) : links.length === 0 ? (
+          <EmptyPanel title="No links yet" body="Paste a URL above to create your first Ziplink." />
+        ) : sortedLinks.length === 0 ? (
+          <EmptyPanel title="No links match" body={`Nothing matches “${search.trim()}”. Try a different search.`} />
+        ) : (
+          <div className="space-y-3">
+            {sortedLinks.map((link) => (
+              <LinkCard
+                key={link.shortCode}
+                link={link}
+                selected={selectedCodes.has(link.shortCode)}
+                onToggleSelect={toggleSelect}
+                onDelete={handleDelete}
+                onShowQr={setQrLink}
+                onEdit={setEditLink}
+                onCopied={() => toast.success("Link copied to clipboard")}
+                onCopyError={() => toast.error("Couldn't copy the link to your clipboard.")}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {showList && selectedCount > 0 ? (
+        <BulkActionBar
+          count={selectedCount}
+          onDeleteSelected={handleDeleteSelected}
+          onExportSelected={handleExportSelected}
+          onClear={clearSelection}
+        />
+      ) : null}
 
       {qrLink ? <QrModal link={qrLink} onClose={() => setQrLink(null)} /> : null}
       {editLink ? (
-        <EditLinkModal
-          link={editLink}
-          onClose={() => setEditLink(null)}
-          onSaved={handleUpdated}
-        />
+        <EditLinkModal link={editLink} onClose={() => setEditLink(null)} onSaved={handleUpdated} />
       ) : null}
-    </div>
+    </>
   );
 }
 
-/** Sort a list of links by the selected key without mutating the input. */
 function sortLinks(items: LinkItem[], sort: SortKey): LinkItem[] {
   const copy = [...items];
-  if (sort === "oldest") {
-    copy.sort((a, b) => toTime(a.createdAt) - toTime(b.createdAt));
-  } else if (sort === "clicks") {
-    copy.sort(
-      (a, b) => b.clicks - a.clicks || toTime(b.createdAt) - toTime(a.createdAt),
-    );
-  } else {
-    copy.sort((a, b) => toTime(b.createdAt) - toTime(a.createdAt));
-  }
+  if (sort === "oldest") copy.sort((a, b) => toTime(a.createdAt) - toTime(b.createdAt));
+  else if (sort === "clicks")
+    copy.sort((a, b) => b.clicks - a.clicks || toTime(b.createdAt) - toTime(a.createdAt));
+  else copy.sort((a, b) => toTime(b.createdAt) - toTime(a.createdAt));
   return copy;
 }
 
-/** Parse an ISO date to epoch ms, treating missing/invalid as 0. */
 function toTime(value: string | null): number {
   if (!value) return 0;
   const time = new Date(value).getTime();
   return Number.isNaN(time) ? 0 : time;
 }
 
-/** Compact, accessible sort control styled with the design-system field. */
-function SortSelect({
-  value,
-  onChange,
-}: {
-  value: SortKey;
-  onChange: (value: SortKey) => void;
-}) {
+function SortSelect({ value, onChange }: { value: SortKey; onChange: (value: SortKey) => void }) {
   return (
     <div className="relative">
-      <label htmlFor="sort-links" className="sr-only">
-        Sort links
-      </label>
+      <label htmlFor="sort-links" className="sr-only">Sort links</label>
       <select
         id="sort-links"
         value={value}
@@ -536,7 +531,47 @@ function SortSelect({
   );
 }
 
-/** Display just the short code portion of a shortUrl (host/CODE -> CODE). */
+function SelectAllControl({
+  checked,
+  indeterminate,
+  onChange,
+  count,
+}: {
+  checked: boolean;
+  indeterminate: boolean;
+  onChange: () => void;
+  count: number;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate && !checked;
+  }, [indeterminate, checked]);
+
+  return (
+    <label className="inline-flex min-h-10 cursor-pointer items-center gap-2.5 text-sm text-muted-strong">
+      <input
+        ref={ref}
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        className="h-[18px] w-[18px] cursor-pointer rounded-[6px] border-border-strong accent-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+      />
+      <span className="font-medium">
+        {checked ? "Deselect all" : "Select all"}
+        <span className="ml-1 text-muted tabular-nums">({count})</span>
+      </span>
+    </label>
+  );
+}
+
+function DownloadGlyph() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 4v10m0 0 3.5-3.5M12 14l-3.5-3.5M5 18.5h14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function displayShortCode(shortUrl: string): string {
   const withoutProtocol = shortUrl.replace(/^https?:\/\//, "");
   const parts = withoutProtocol.split("/");
@@ -581,9 +616,7 @@ function EmptyPanel({
     <div className="animate-fade-up rounded-[var(--radius-lg)] border border-dashed border-border-strong bg-surface p-12 text-center shadow-[var(--shadow-sm)]">
       <span
         className={`mx-auto flex h-12 w-12 items-center justify-center rounded-full ${
-          tone === "warning"
-            ? "bg-[color:var(--danger-soft)] text-danger"
-            : "brand-gradient text-white"
+          tone === "warning" ? "bg-[color:var(--danger-soft)] text-danger" : "brand-gradient text-white"
         }`}
       >
         {tone === "warning" ? (
