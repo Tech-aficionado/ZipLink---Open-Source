@@ -120,6 +120,14 @@
 * { border-color: var(--border); }
 html { -webkit-text-size-adjust: 100%; }
 
+/* Prevent accidental horizontal scroll on mobile. `clip` does not create a
+   scroll container, so sticky/`position: sticky` elements keep working. */
+html,
+body {
+  overflow-x: clip;
+  max-width: 100%;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

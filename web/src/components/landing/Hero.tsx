@@ -82,8 +82,8 @@ export default function Hero() {
           </p>
         </div>
 
-        <div className="flex justify-center lg:justify-end">
-          <div className="animate-float">
+        <div className="flex min-w-0 justify-center lg:justify-end">
+          <div className="animate-float w-full max-w-md min-w-0">
             <TransformDemo />
           </div>
         </div>

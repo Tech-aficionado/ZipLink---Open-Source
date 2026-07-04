@@ -26,5 +26,11 @@
     "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "comments": {
+    "overrides": "jwks-rsa (via firebase-admin) does require('jose'); jose v5+ is ESM-only and breaks require() in the serverless build. Pin jose to the last CJS release (v4). jwks-rsa only uses importJWK/exportSPKI, which exist in v4."
+  },
+  "overrides": {
+    "jose": "^4.15.9"
   }
 }
