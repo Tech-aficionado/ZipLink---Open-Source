@@ -235,7 +235,8 @@ html { scrollbar-width: none; -ms-overflow-style: none; }
   background: var(--surface);
   color: var(--foreground);
   padding: 0.8rem 1rem;
-  font-size: 0.95rem;
+  /* 16px prevents iOS Safari from zooming when the field is focused. */
+  font-size: 1rem;
   line-height: 1.4;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
   outline: none;

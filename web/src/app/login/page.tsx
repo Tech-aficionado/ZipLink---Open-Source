@@ -76,7 +76,7 @@ export default function LoginPage() {
           Fast, private URL shortening
         </span>
 
-        <h1 className="animate-fade-up mt-6 max-w-3xl text-balance text-5xl font-semibold leading-[1.05] tracking-tight text-foreground sm:text-6xl">
+        <h1 className="animate-fade-up mt-6 max-w-3xl text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-foreground sm:text-5xl md:text-6xl">
           Shorten links <span className="brand-text">in a zip.</span>
         </h1>
 
@@ -89,7 +89,7 @@ export default function LoginPage() {
         <div className="animate-fade-up mt-10 w-full max-w-xl">
           <div className="rounded-2xl border border-border bg-surface/80 p-2 shadow-[var(--shadow-lg)] backdrop-blur">
             <div className="flex items-center gap-2 rounded-xl bg-surface-muted px-4 py-3 text-left">
-              <span className="truncate font-mono text-sm text-muted">
+              <span className="min-w-0 truncate font-mono text-sm text-muted">
                 https://example.com/articles/2026/very-long-slug?ref=share
               </span>
             </div>

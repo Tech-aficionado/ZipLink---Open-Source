@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { ToastProvider, useToast } from "@/context/ToastContext";
+import Toaster from "@/components/Toaster";
 import Button from "@/components/Button";
 import BrandSplash from "@/components/BrandSplash";
 import Logo from "@/components/Logo";
@@ -10,6 +12,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import LinkCard from "@/components/LinkCard";
 import { LinkCardSkeleton } from "@/components/Skeleton";
 import QrModal from "@/components/QrModal";
+import EditLinkModal from "@/components/EditLinkModal";
 import StatCard from "@/components/StatCard";
 import SearchInput from "@/components/SearchInput";
 import {
@@ -27,9 +30,25 @@ const ALIAS_HELP = "optional — 3–32 letters, numbers, - or _";
 const BACKEND_UNCONFIGURED_MESSAGE =
   "Server not fully configured yet — add the Firebase service account key to start creating links.";
 
+type SortKey = "newest" | "oldest" | "clicks";
+
+/**
+ * Page shell: provides toast context to the whole dashboard tree and renders
+ * the Toaster alongside the workspace.
+ */
 export default function DashboardPage() {
+  return (
+    <ToastProvider>
+      <DashboardWorkspace />
+      <Toaster />
+    </ToastProvider>
+  );
+}
+
+function DashboardWorkspace() {
   const { user, loading, signOutUser } = useAuth();
   const router = useRouter();
+  const toast = useToast();
 
   const [links, setLinks] = useState<LinkItem[]>([]);
   const [listLoading, setListLoading] = useState(true);
@@ -43,9 +62,12 @@ export default function DashboardPage() {
   const [lastCreated, setLastCreated] = useState<LinkItem | null>(null);
   const [copied, setCopied] = useState(false);
   const copyTimer = useRef<number | undefined>(undefined);
+  const urlInputRef = useRef<HTMLInputElement>(null);
 
   const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<SortKey>("newest");
   const [qrLink, setQrLink] = useState<LinkItem | null>(null);
+  const [editLink, setEditLink] = useState<LinkItem | null>(null);
 
   const aliasPrefix = baseHostPrefix();
 
@@ -56,6 +78,14 @@ export default function DashboardPage() {
   useEffect(() => {
     return () => window.clearTimeout(copyTimer.current);
   }, []);
+
+  // Auto-focus the URL field on desktop only, so mobile keyboards don't pop up.
+  useEffect(() => {
+    if (!user) return;
+    if (window.matchMedia("(min-width: 768px)").matches) {
+      urlInputRef.current?.focus({ preventScroll: true });
+    }
+  }, [user]);
 
   const loadLinks = useCallback(async () => {
     setListLoading(true);
@@ -124,6 +154,7 @@ export default function DashboardPage() {
       setUrl("");
       setAlias("");
       setBackendUnavailable(false);
+      toast.success("Short link created");
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 503) {
@@ -152,29 +183,54 @@ export default function DashboardPage() {
       setCopied(true);
       window.clearTimeout(copyTimer.current);
       copyTimer.current = window.setTimeout(() => setCopied(false), 2000);
+      toast.success("Link copied to clipboard");
     } catch {
-      /* ignore clipboard failures */
+      toast.error("Couldn't copy — select the link and copy it manually.");
     }
   };
 
-  const handleDelete = useCallback(async (shortCode: string) => {
-    try {
-      await deleteLink(shortCode);
-      setLinks((prev) => prev.filter((item) => item.shortCode !== shortCode));
-      setLastCreated((prev) =>
-        prev && prev.shortCode === shortCode ? null : prev,
-      );
-      setQrLink((prev) => (prev && prev.shortCode === shortCode ? null : prev));
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 503) {
-        setListError(BACKEND_UNCONFIGURED_MESSAGE);
-      } else if (err instanceof Error) {
-        setListError(err.message);
-      } else {
-        setListError("Failed to delete that link.");
+  const handleDelete = useCallback(
+    async (shortCode: string) => {
+      try {
+        await deleteLink(shortCode);
+        setLinks((prev) => prev.filter((item) => item.shortCode !== shortCode));
+        setLastCreated((prev) =>
+          prev && prev.shortCode === shortCode ? null : prev,
+        );
+        setQrLink((prev) => (prev && prev.shortCode === shortCode ? null : prev));
+        setEditLink((prev) =>
+          prev && prev.shortCode === shortCode ? null : prev,
+        );
+        toast.success("Link deleted");
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 503) {
+          toast.error(BACKEND_UNCONFIGURED_MESSAGE);
+        } else if (err instanceof Error) {
+          toast.error(err.message);
+        } else {
+          toast.error("Failed to delete that link.");
+        }
       }
-    }
-  }, []);
+    },
+    [toast],
+  );
+
+  const handleUpdated = useCallback(
+    (updated: LinkItem) => {
+      setLinks((prev) =>
+        prev.map((item) =>
+          item.shortCode === updated.shortCode ? { ...item, ...updated } : item,
+        ),
+      );
+      setLastCreated((prev) =>
+        prev && prev.shortCode === updated.shortCode
+          ? { ...prev, ...updated }
+          : prev,
+      );
+      toast.success("Destination updated");
+    },
+    [toast],
+  );
 
   const handleSignOut = async () => {
     await signOutUser();
@@ -198,6 +254,8 @@ export default function DashboardPage() {
       )
     : links;
 
+  const sortedLinks = sortLinks(filteredLinks, sort);
+
   const showList =
     !listLoading && !backendUnavailable && !listError && links.length > 0;
 
@@ -211,11 +269,11 @@ export default function DashboardPage() {
     <div className="flex min-h-dvh flex-1 flex-col bg-background">
       {/* Nav */}
       <header className="sticky top-0 z-20 border-b border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <Logo />
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3">
             <ThemeToggle />
-            <div className="flex items-center gap-2 rounded-full border border-border bg-surface py-1 pl-1 pr-1 sm:pr-3">
+            <div className="flex items-center gap-2 rounded-full border border-border bg-surface p-1 sm:pr-3">
               <span className="inline-flex h-7 w-7 items-center justify-center rounded-full brand-gradient text-xs font-semibold text-white">
                 {initial}
               </span>
@@ -230,7 +288,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-10 sm:px-6 sm:py-12">
+      <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-6 sm:py-12">
         {/* Create */}
         <section className="animate-fade-up">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
@@ -243,6 +301,7 @@ export default function DashboardPage() {
           <form onSubmit={handleCreate} className="mt-5 flex flex-col gap-3" noValidate>
             <div className="flex flex-col gap-3 sm:flex-row">
               <input
+                ref={urlInputRef}
                 type="url"
                 inputMode="url"
                 value={url}
@@ -252,7 +311,7 @@ export default function DashboardPage() {
                 aria-invalid={formError ? true : undefined}
                 className="zip-field flex-1"
               />
-              <Button type="submit" size="lg" loading={creating} className="sm:w-40">
+              <Button type="submit" size="lg" loading={creating} className="w-full sm:w-40">
                 {creating ? "Shortening" : "Shorten link"}
               </Button>
             </div>
@@ -276,7 +335,7 @@ export default function DashboardPage() {
                   autoCorrect="off"
                   spellCheck={false}
                   maxLength={32}
-                  className="zip-field flex-1 rounded-l-none font-mono"
+                  className="zip-field min-w-0 flex-1 rounded-l-none font-mono"
                 />
               </div>
               <p id="alias-help" className="text-xs text-muted">
@@ -354,12 +413,15 @@ export default function DashboardPage() {
               ) : null}
             </div>
             {showList ? (
-              <div className="sm:w-64">
-                <SearchInput
-                  value={search}
-                  onChange={setSearch}
-                  placeholder="Search by code or URL…"
-                />
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                <div className="sm:w-56">
+                  <SearchInput
+                    value={search}
+                    onChange={setSearch}
+                    placeholder="Search by code or URL…"
+                  />
+                </div>
+                <SortSelect value={sort} onChange={setSort} />
               </div>
             ) : null}
           </div>
@@ -383,19 +445,24 @@ export default function DashboardPage() {
             </div>
           ) : links.length === 0 ? (
             <EmptyPanel title="No links yet" body="Paste a URL above to create your first Ziplink." />
-          ) : filteredLinks.length === 0 ? (
+          ) : sortedLinks.length === 0 ? (
             <EmptyPanel
               title="No links match"
               body={`Nothing matches “${search.trim()}”. Try a different search.`}
             />
           ) : (
             <div className="space-y-3">
-              {filteredLinks.map((link) => (
+              {sortedLinks.map((link) => (
                 <LinkCard
                   key={link.shortCode}
                   link={link}
                   onDelete={handleDelete}
                   onShowQr={setQrLink}
+                  onEdit={setEditLink}
+                  onCopied={() => toast.success("Link copied to clipboard")}
+                  onCopyError={() =>
+                    toast.error("Couldn't copy the link to your clipboard.")
+                  }
                 />
               ))}
             </div>
@@ -404,6 +471,67 @@ export default function DashboardPage() {
       </main>
 
       {qrLink ? <QrModal link={qrLink} onClose={() => setQrLink(null)} /> : null}
+      {editLink ? (
+        <EditLinkModal
+          link={editLink}
+          onClose={() => setEditLink(null)}
+          onSaved={handleUpdated}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/** Sort a list of links by the selected key without mutating the input. */
+function sortLinks(items: LinkItem[], sort: SortKey): LinkItem[] {
+  const copy = [...items];
+  if (sort === "oldest") {
+    copy.sort((a, b) => toTime(a.createdAt) - toTime(b.createdAt));
+  } else if (sort === "clicks") {
+    copy.sort(
+      (a, b) => b.clicks - a.clicks || toTime(b.createdAt) - toTime(a.createdAt),
+    );
+  } else {
+    copy.sort((a, b) => toTime(b.createdAt) - toTime(a.createdAt));
+  }
+  return copy;
+}
+
+/** Parse an ISO date to epoch ms, treating missing/invalid as 0. */
+function toTime(value: string | null): number {
+  if (!value) return 0;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
+/** Compact, accessible sort control styled with the design-system field. */
+function SortSelect({
+  value,
+  onChange,
+}: {
+  value: SortKey;
+  onChange: (value: SortKey) => void;
+}) {
+  return (
+    <div className="relative">
+      <label htmlFor="sort-links" className="sr-only">
+        Sort links
+      </label>
+      <select
+        id="sort-links"
+        value={value}
+        onChange={(event) => onChange(event.target.value as SortKey)}
+        className="zip-field w-full cursor-pointer appearance-none pr-9 sm:w-44"
+      >
+        <option value="newest">Newest first</option>
+        <option value="oldest">Oldest first</option>
+        <option value="clicks">Most clicks</option>
+      </select>
+      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted">
+        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </span>
     </div>
   );
 }
