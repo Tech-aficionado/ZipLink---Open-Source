@@ -1,0 +1,35 @@
+# ---- Ziplink repo root ignore ----
+
+# dependencies / build output (anywhere)
+node_modules/
+.next/
+out/
+build/
+dist/
+coverage/
+.turbo/
+
+# secrets — NEVER commit
+.env
+.env.*
+!.env.example
+*.pem
+serviceAccount*.json
+*firebase-adminsdk*.json
+*-service-account*.json
+
+# vercel / tooling
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+
+# logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# os / editor
+.DS_Store
+Thumbs.db
