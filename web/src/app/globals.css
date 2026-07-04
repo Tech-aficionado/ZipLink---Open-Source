@@ -28,15 +28,16 @@
   --brand-gradient: linear-gradient(120deg, #635bff 0%, #7c5cff 45%, #22d3ee 100%);
   --brand-gradient-2: linear-gradient(120deg, #a855f7 0%, #635bff 55%, #22d3ee 100%);
 
-  /* Semantic — light */
-  --background: #fbfbfd;
+  /* Semantic — light. A soft cool lavender canvas (not flat white) so glass
+     surfaces and the aurora have something to lift off of. */
+  --background: #eef0fa;
   --surface: #ffffff;
-  --surface-muted: #f4f5f8;
-  --border: #ececf1;
-  --border-strong: #dfe0e8;
-  --foreground: #101014;
-  --muted: #6a6a78;
-  --muted-strong: #45454f;
+  --surface-muted: #e8eaf6;
+  --border: #e0e2f0;
+  --border-strong: #cfd2e6;
+  --foreground: #12121c;
+  --muted: #63647a;
+  --muted-strong: #3f4052;
 
   --success: #0f9d63;
   --success-soft: #e7f7ef;
@@ -307,14 +308,14 @@ html { scrollbar-width: none; -ms-overflow-style: none; }
 /* Frosted panel. Sits over the app aurora so the blur has color to refract. */
 .glass-card {
   position: relative;
-  background: color-mix(in srgb, var(--surface) 58%, transparent);
-  backdrop-filter: blur(22px) saturate(165%);
-  -webkit-backdrop-filter: blur(22px) saturate(165%);
-  border: 1px solid color-mix(in srgb, var(--foreground) 9%, transparent);
+  background: color-mix(in srgb, var(--surface) 74%, transparent);
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  border: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
   border-radius: var(--radius-lg);
   box-shadow:
-    inset 0 1px 0 color-mix(in srgb, #ffffff 10%, transparent),
-    0 14px 38px -16px rgba(8, 8, 24, 0.5);
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    0 12px 32px -16px rgba(40, 40, 90, 0.28);
 }
 .dark .glass-card {
   background: color-mix(in srgb, var(--surface) 44%, transparent);
@@ -326,7 +327,7 @@ html { scrollbar-width: none; -ms-overflow-style: none; }
 
 /* A subtly stronger sheet used for navigation surfaces. */
 .glass-nav {
-  background: color-mix(in srgb, var(--background) 60%, transparent);
+  background: color-mix(in srgb, var(--background) 85%, transparent);
   backdrop-filter: blur(20px) saturate(160%);
   -webkit-backdrop-filter: blur(20px) saturate(160%);
 }
@@ -358,13 +359,25 @@ html { scrollbar-width: none; -ms-overflow-style: none; }
   pointer-events: none;
 }
 
-/* Ambient, fixed background for the dashboard — colorful blobs + faint grid. */
+/* Ambient animated background for the app — three drifting color fields:
+   a violet glow panning across the top (on the element), plus an indigo and a
+   cyan blob that slowly wander on independent paths. Per-theme opacity keeps
+   it vivid on dark and soft on light. */
 .app-aurora {
   position: fixed;
   inset: 0;
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
+  background-image: radial-gradient(
+    42rem 34rem at 50% -8%,
+    color-mix(in srgb, var(--violet) 24%, transparent),
+    transparent 70%
+  );
+  background-repeat: no-repeat;
+  /* Larger than the viewport so `background-position` has room to pan. */
+  background-size: 140% 140%;
+  animation: aurora-pan 24s ease-in-out infinite alternate;
 }
 .app-aurora::before,
 .app-aurora::after {
@@ -372,28 +385,51 @@ html { scrollbar-width: none; -ms-overflow-style: none; }
   position: absolute;
   border-radius: 9999px;
   filter: blur(100px);
-  opacity: 0.5;
-  animation: glow-drift 18s ease-in-out infinite alternate;
+  will-change: transform;
 }
 .app-aurora::before {
   width: 46rem;
   height: 46rem;
-  top: -14rem;
-  left: -10rem;
-  background: radial-gradient(circle at center, #635bff, transparent 62%);
+  top: -15rem;
+  left: -12rem;
+  background: radial-gradient(circle at center, var(--brand-500), transparent 62%);
+  opacity: 0.3;
+  animation: aurora-drift-1 21s ease-in-out infinite alternate;
 }
 .app-aurora::after {
-  width: 42rem;
-  height: 42rem;
-  bottom: -16rem;
-  right: -10rem;
-  background: radial-gradient(circle at center, #22d3ee, transparent 62%);
-  animation-delay: -6s;
+  width: 44rem;
+  height: 44rem;
+  bottom: -17rem;
+  right: -12rem;
+  background: radial-gradient(circle at center, var(--cyan), transparent 62%);
+  opacity: 0.26;
+  animation: aurora-drift-2 27s ease-in-out infinite alternate;
 }
-.dark .app-aurora::before { opacity: 0.4; }
-.dark .app-aurora::after { opacity: 0.34; }
+.dark .app-aurora {
+  background-image: radial-gradient(
+    42rem 34rem at 50% -8%,
+    color-mix(in srgb, var(--violet) 34%, transparent),
+    transparent 70%
+  );
+}
+.dark .app-aurora::before { opacity: 0.44; }
+.dark .app-aurora::after { opacity: 0.38; }
+
+@keyframes aurora-pan {
+  from { background-position: 45% -8%; }
+  to { background-position: 55% 5%; }
+}
+@keyframes aurora-drift-1 {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(9%, 7%) scale(1.16); }
+}
+@keyframes aurora-drift-2 {
+  0% { transform: translate(0, 0) scale(1.06); }
+  100% { transform: translate(-8%, -6%) scale(1); }
+}
 
 @media (prefers-reduced-motion: reduce) {
+  .app-aurora,
   .app-aurora::before,
   .app-aurora::after { animation: none; }
 }
