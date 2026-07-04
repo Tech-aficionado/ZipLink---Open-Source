@@ -1,0 +1,32 @@
+rules_version = '2';
+
+// Firestore security rules for the URL shortener.
+//
+// NOTE: The application writes to Firestore via the firebase-admin SDK, which
+// runs with full privileges and BYPASSES these rules entirely. These rules
+// exist to protect against any *direct* client SDK access to the database.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // `links` collection: document id === shortCode.
+    match /links/{shortCode} {
+      // Only the owner may read their link.
+      allow read: if request.auth != null
+                  && request.auth.uid == resource.data.ownerUid;
+
+      // A signed-in user may create a link only for themselves: the incoming
+      // ownerUid must match their own uid.
+      allow create: if request.auth != null
+                    && request.resource.data.ownerUid == request.auth.uid;
+
+      // Only the owner may update or delete their link.
+      allow update, delete: if request.auth != null
+                            && request.auth.uid == resource.data.ownerUid;
+    }
+
+    // Default deny: anything not explicitly matched above is rejected.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
