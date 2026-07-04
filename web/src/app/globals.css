@@ -1,0 +1,285 @@
+@import "tailwindcss";
+
+/* Class-based dark mode (toggle); initial class set by inline script in layout. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ===========================================================================
+   Ziplink — futuristic design system
+   Dark-first. Neon indigo -> cyan. Glass surfaces, gradient borders, glow.
+   =========================================================================== */
+:root {
+  /* Brand ramp (indigo) */
+  --brand-50: #eef0ff;
+  --brand-100: #e0e3ff;
+  --brand-200: #c7ccff;
+  --brand-300: #a5abff;
+  --brand-400: #8188fb;
+  --brand-500: #635bff;
+  --brand-600: #524bf5;
+  --brand-700: #4038d1;
+  --brand-800: #342ea3;
+  --brand-900: #2c2880;
+
+  /* Neon accents */
+  --cyan: #22d3ee;
+  --violet: #a855f7;
+  --fuchsia: #e451ff;
+
+  --brand-gradient: linear-gradient(120deg, #635bff 0%, #7c5cff 45%, #22d3ee 100%);
+  --brand-gradient-2: linear-gradient(120deg, #a855f7 0%, #635bff 55%, #22d3ee 100%);
+
+  /* Semantic — light */
+  --background: #fbfbfd;
+  --surface: #ffffff;
+  --surface-muted: #f4f5f8;
+  --border: #ececf1;
+  --border-strong: #dfe0e8;
+  --foreground: #101014;
+  --muted: #6a6a78;
+  --muted-strong: #45454f;
+
+  --success: #0f9d63;
+  --success-soft: #e7f7ef;
+  --danger: #e02b52;
+  --danger-soft: #fdecef;
+
+  --radius-sm: 0.625rem;
+  --radius: 0.875rem;
+  --radius-lg: 1.125rem;
+  --radius-xl: 1.5rem;
+
+  --shadow-sm: 0 1px 2px rgba(16, 16, 20, 0.05), 0 1px 3px rgba(16, 16, 20, 0.04);
+  --shadow-md: 0 6px 20px -6px rgba(16, 16, 20, 0.12), 0 2px 6px rgba(16, 16, 20, 0.05);
+  --shadow-lg: 0 24px 60px -18px rgba(60, 50, 130, 0.30);
+  --ring: 0 0 0 3px rgba(99, 91, 255, 0.30);
+  --glow: 0 0 0 1px rgba(99, 91, 255, 0.25), 0 8px 40px -8px rgba(99, 91, 255, 0.45);
+
+  --grid-line: rgba(16, 16, 20, 0.05);
+}
+
+.dark {
+  --background: #06060b;
+  --surface: #0f0f1a;
+  --surface-muted: #16162a;
+  --border: #20203a;
+  --border-strong: #2e2e50;
+  --foreground: #f2f3fb;
+  --muted: #9090ad;
+  --muted-strong: #bcbcd6;
+
+  --success: #34d399;
+  --success-soft: #0e3527;
+  --danger: #ff6b85;
+  --danger-soft: #3a1620;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 28px 70px -18px rgba(0, 0, 0, 0.8);
+  --ring: 0 0 0 3px rgba(129, 136, 251, 0.4);
+  --glow: 0 0 0 1px rgba(124, 92, 255, 0.35), 0 10px 60px -10px rgba(99, 91, 255, 0.55);
+
+  --grid-line: rgba(140, 140, 220, 0.07);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-strong: var(--muted-strong);
+
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+  --color-cyan: var(--cyan);
+  --color-violet: var(--violet);
+  --color-fuchsia: var(--fuchsia);
+
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+
+  --radius-md: var(--radius-sm);
+  --radius-lg: var(--radius);
+  --radius-xl: var(--radius-lg);
+  --radius-2xl: var(--radius-xl);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* { border-color: var(--border); }
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+::selection { background: rgba(99, 91, 255, 0.28); }
+
+/* Hide scrollbars everywhere while keeping scroll functional. */
+html { scrollbar-width: none; -ms-overflow-style: none; }
+* { scrollbar-width: none; }
+*::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+/* --- Backgrounds ----------------------------------------------------------- */
+.grid-bg {
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 48px 48px;
+  background-position: center;
+}
+.grid-fade {
+  -webkit-mask-image: radial-gradient(ellipse 85% 70% at 50% 35%, #000 40%, transparent 100%);
+  mask-image: radial-gradient(ellipse 85% 70% at 50% 35%, #000 40%, transparent 100%);
+}
+
+/* Animated aurora glow for hero surfaces. */
+.glow { position: relative; isolation: isolate; }
+.glow::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: -25%;
+  left: 50%;
+  width: min(56rem, 95vw);
+  height: 40rem;
+  transform: translateX(-50%);
+  background:
+    radial-gradient(ellipse 40% 60% at 30% 40%, rgba(99,91,255,0.28), transparent 70%),
+    radial-gradient(ellipse 40% 60% at 70% 45%, rgba(34,211,238,0.22), transparent 70%);
+  filter: blur(24px);
+  pointer-events: none;
+  animation: glow-drift 14s ease-in-out infinite alternate;
+}
+@keyframes glow-drift {
+  0%   { transform: translateX(-52%) translateY(0) scale(1); }
+  100% { transform: translateX(-48%) translateY(18px) scale(1.08); }
+}
+.dark .glow::before { opacity: 0.9; }
+
+/* Floating orb accents. */
+.orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(60px);
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* --- Surfaces -------------------------------------------------------------- */
+.glass {
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+}
+
+/* Gradient-bordered card: put content in a child. */
+.border-gradient {
+  position: relative;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+}
+.border-gradient::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: var(--brand-gradient);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.glow-ring { box-shadow: var(--glow); }
+
+/* --- Text/gradient helpers ------------------------------------------------- */
+.brand-gradient { background-image: var(--brand-gradient); }
+.brand-gradient-2 { background-image: var(--brand-gradient-2); }
+.brand-text {
+  background-image: var(--brand-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.brand-text-2 {
+  background-image: var(--brand-gradient-2);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* --- Controls -------------------------------------------------------------- */
+.zip-field {
+  width: 100%;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--foreground);
+  padding: 0.8rem 1rem;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  outline: none;
+}
+.zip-field::placeholder { color: var(--muted); }
+.zip-field:focus { border-color: var(--brand-500); box-shadow: var(--ring); }
+
+/* --- Motion ---------------------------------------------------------------- */
+@keyframes zip-fade-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up { animation: zip-fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes zip-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.animate-float { animation: zip-float 6s ease-in-out infinite; }
+
+@keyframes zip-pulse-glow {
+  0%, 100% { opacity: 0.9; transform: scale(1); filter: drop-shadow(0 0 6px rgba(99, 91, 255, 0.45)); }
+  50% { opacity: 1; transform: scale(1.06); filter: drop-shadow(0 0 18px rgba(34, 211, 238, 0.7)); }
+}
+.animate-pulse-glow { animation: zip-pulse-glow 2.4s ease-in-out infinite; }
+
+@keyframes zip-draw { from { stroke-dashoffset: 130; } to { stroke-dashoffset: 0; } }
+.animate-draw path { stroke-dasharray: 130; animation: zip-draw 1.8s cubic-bezier(0.65, 0, 0.35, 1) forwards; }
+
+@keyframes zip-shimmer { 100% { transform: translateX(100%); } }
+.skeleton { position: relative; overflow: hidden; background: var(--surface-muted); }
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--foreground) 8%, transparent), transparent);
+  animation: zip-shimmer 1.5s infinite;
+}
+
+/* Marquee for logo/scroller strips. */
+@keyframes zip-marquee { to { transform: translateX(-50%); } }
+.animate-marquee { animation: zip-marquee 22s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up, .animate-float, .animate-marquee, .animate-pulse-glow, .animate-draw path, .skeleton::after, .glow::before { animation: none; }
+}
