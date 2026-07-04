@@ -5,6 +5,8 @@ const FOOTER_LINKS: readonly { label: string; href: string }[] = [
   { label: "Features", href: "#features" },
   { label: "How it works", href: "#how-it-works" },
   { label: "Sign in", href: "/login" },
+  { label: "Privacy", href: "/privacy" },
+  { label: "Terms", href: "/terms" },
 ];
 
 /** Site footer with brand mark, tagline, quick links, and small print. */
