@@ -38,8 +38,9 @@ keys, and you're running.
 - **Custom aliases** — let Ziplink generate a code, or choose your own
 - **QR codes** — preview and download a QR for any link
 - **Click tracking** — see how many times each link has been opened, and when
-- **Search & manage** — filter your links and delete the ones you're done with
-- **Dark, modern UI** — dark-first design with a clean dashboard
+- **Edit & manage** — change a link's destination, search your links, sort by newest or most clicks, and delete what you don't need
+- **Dark, modern UI** — dark-first design with a clean, mobile-friendly dashboard
+- **Installable PWA** — add it to your home screen and launch it like an app
 - **Optional split domain** — serve short links from a separate short domain
 
 ## Tech stack
