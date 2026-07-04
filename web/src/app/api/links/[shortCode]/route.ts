@@ -10,6 +10,17 @@ import {
 export const runtime = 'nodejs';
 
 const LINKS_COLLECTION = 'links';
+const MAX_URL_LENGTH = 2048;
+
+function isValidHttpUrl(value: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return false;
+  }
+  return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+}
 
 interface LinkDocument {
   shortCode: string;
@@ -108,6 +119,77 @@ export async function DELETE(req: Request, ctx: RouteContext): Promise<NextRespo
 
     // 204 No Content — empty body.
     return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
+/**
+ * PATCH /api/links/[shortCode]
+ * Updates the destination (originalUrl) of a link owned by the caller.
+ * Body: { originalUrl: string }. Returns the updated link, or 404 if missing
+ * or not owned by the caller, or 400 for an invalid URL.
+ */
+export async function PATCH(req: Request, ctx: RouteContext): Promise<NextResponse> {
+  try {
+    const { uid } = await getAuthFromRequest(req);
+    const { shortCode } = await ctx.params;
+
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    const raw =
+      typeof body === 'object' && body !== null && !Array.isArray(body)
+        ? (body as { originalUrl?: unknown }).originalUrl
+        : undefined;
+
+    if (typeof raw !== 'string') {
+      return NextResponse.json(
+        { error: 'A valid http(s) originalUrl is required' },
+        { status: 400 },
+      );
+    }
+
+    const originalUrl = raw.trim();
+    if (originalUrl.length > MAX_URL_LENGTH) {
+      return NextResponse.json(
+        { error: `originalUrl must be at most ${MAX_URL_LENGTH} characters` },
+        { status: 400 },
+      );
+    }
+    if (!isValidHttpUrl(originalUrl)) {
+      return NextResponse.json(
+        { error: 'A valid http(s) originalUrl is required' },
+        { status: 400 },
+      );
+    }
+
+    const db = getFirestore();
+    const docRef = db.collection(LINKS_COLLECTION).doc(shortCode);
+    const snapshot = await docRef.get();
+    const data = snapshot.data() as LinkDocument | undefined;
+
+    if (!snapshot.exists || !data || data.ownerUid !== uid) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    await docRef.update({ originalUrl });
+
+    return NextResponse.json(
+      {
+        shortCode: snapshot.id,
+        originalUrl,
+        shortUrl: buildShortUrl(snapshot.id),
+        clicks: data.clicks ?? 0,
+        createdAt: timestampToIso(data.createdAt ?? null),
+        lastAccessedAt: timestampToIso(data.lastAccessedAt ?? null),
+      },
+      { status: 200 },
+    );
   } catch (error) {
     return errorResponse(error);
   }

@@ -153,3 +153,27 @@ export async function deleteLink(shortCode: string): Promise<void> {
     await parseError(response);
   }
 }
+
+/**
+ * Update the destination URL of one of the current user's links.
+ */
+export async function updateLink(
+  shortCode: string,
+  originalUrl: string,
+): Promise<LinkItem> {
+  const headers = await authHeaders();
+  const response = await fetch(
+    `/api/links/${encodeURIComponent(shortCode)}`,
+    {
+      method: "PATCH",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ originalUrl }),
+    },
+  );
+
+  if (!response.ok) {
+    await parseError(response);
+  }
+
+  return (await response.json()) as LinkItem;
+}
