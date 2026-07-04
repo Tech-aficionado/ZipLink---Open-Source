@@ -376,8 +376,8 @@ html { scrollbar-width: none; -ms-overflow-style: none; }
   );
   background-repeat: no-repeat;
   /* Larger than the viewport so `background-position` has room to pan. */
-  background-size: 140% 140%;
-  animation: aurora-pan 24s ease-in-out infinite alternate;
+  background-size: 170% 170%;
+  animation: aurora-pan 20s ease-in-out infinite alternate;
 }
 .app-aurora::before,
 .app-aurora::after {
@@ -394,7 +394,7 @@ html { scrollbar-width: none; -ms-overflow-style: none; }
   left: -12rem;
   background: radial-gradient(circle at center, var(--brand-500), transparent 62%);
   opacity: 0.3;
-  animation: aurora-drift-1 21s ease-in-out infinite alternate;
+  animation: aurora-drift-1 18s ease-in-out infinite alternate;
 }
 .app-aurora::after {
   width: 44rem;
@@ -403,7 +403,7 @@ html { scrollbar-width: none; -ms-overflow-style: none; }
   right: -12rem;
   background: radial-gradient(circle at center, var(--cyan), transparent 62%);
   opacity: 0.26;
-  animation: aurora-drift-2 27s ease-in-out infinite alternate;
+  animation: aurora-drift-2 23s ease-in-out infinite alternate;
 }
 .dark .app-aurora {
   background-image: radial-gradient(
@@ -416,16 +416,18 @@ html { scrollbar-width: none; -ms-overflow-style: none; }
 .dark .app-aurora::after { opacity: 0.38; }
 
 @keyframes aurora-pan {
-  from { background-position: 45% -8%; }
-  to { background-position: 55% 5%; }
+  from { background-position: 30% -8%; }
+  to { background-position: 72% 10%; }
 }
 @keyframes aurora-drift-1 {
   0% { transform: translate(0, 0) scale(1); }
-  100% { transform: translate(9%, 7%) scale(1.16); }
+  50% { transform: translate(26%, 20%) scale(1.24); }
+  100% { transform: translate(44%, 6%) scale(1.1); }
 }
 @keyframes aurora-drift-2 {
-  0% { transform: translate(0, 0) scale(1.06); }
-  100% { transform: translate(-8%, -6%) scale(1); }
+  0% { transform: translate(0, 0) scale(1.12); }
+  50% { transform: translate(-24%, -16%) scale(1); }
+  100% { transform: translate(-40%, 10%) scale(1.2); }
 }
 
 @media (prefers-reduced-motion: reduce) {
