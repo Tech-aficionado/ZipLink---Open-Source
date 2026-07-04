@@ -15,7 +15,8 @@ const MAX_URL_LENGTH = 2048;
 
 // Custom alias rules: 3-32 chars of letters, numbers, hyphen or underscore.
 const CUSTOM_CODE_PATTERN = /^[a-zA-Z0-9_-]{3,32}$/;
-// Codes that would collide with real routes / internals. Compared lowercase.
+// Codes that would collide with real routes / internals, plus aliases we
+// reserve for our own use (e.g. marketing/demo links). Compared lowercase.
 const RESERVED_CODES = new Set<string>([
   'api',
   'health',
@@ -23,6 +24,8 @@ const RESERVED_CODES = new Set<string>([
   'dashboard',
   '_next',
   'favicon.ico',
+  // Reserved for Ziplink's own use.
+  'launch',
 ]);
 
 /**
