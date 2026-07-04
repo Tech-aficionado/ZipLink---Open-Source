@@ -58,7 +58,7 @@ export default function BulkActionBar({
   };
 
   return (
-    <div className="pointer-events-none sticky bottom-0 z-30 -mx-4 mt-4 px-4 pb-4 sm:-mx-6 sm:px-6">
+    <div className="pointer-events-none sticky bottom-0 z-30 -mx-4 mt-4 px-4 pb-24 sm:-mx-6 sm:px-6 lg:pb-4">
       <div className="pointer-events-auto animate-fade-up mx-auto flex w-full max-w-4xl flex-col gap-3 rounded-[var(--radius-lg)] border border-border-strong bg-surface/95 p-3 shadow-[var(--shadow-lg,0_12px_40px_-8px_rgba(0,0,0,0.35))] backdrop-blur sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2 px-1">
           <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full brand-gradient px-2 text-xs font-semibold text-white tabular-nums">

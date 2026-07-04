@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -51,13 +51,8 @@ const NAV: readonly NavItem[] = [
   },
 ];
 
-function NavLinks({
-  pathname,
-  onNavigate,
-}: {
-  pathname: string;
-  onNavigate?: () => void;
-}) {
+/** Desktop sidebar navigation. */
+function SidebarNav({ pathname }: { pathname: string }) {
   return (
     <nav className="flex flex-col gap-1" aria-label="Dashboard">
       {NAV.map((item) => {
@@ -66,7 +61,6 @@ function NavLinks({
           <Link
             key={item.href}
             href={item.href}
-            onClick={onNavigate}
             aria-current={active ? "page" : undefined}
             className={`flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 ${
               active
@@ -83,20 +77,43 @@ function NavLinks({
   );
 }
 
+/** Mobile bottom tab bar. */
+function BottomTabs({ pathname }: { pathname: string }) {
+  return (
+    <nav
+      aria-label="Dashboard"
+      className="glass fixed inset-x-0 bottom-0 z-40 border-t border-border pb-[env(safe-area-inset-bottom)] lg:hidden"
+    >
+      <div className="mx-auto flex max-w-md items-stretch justify-around">
+        {NAV.map((item) => {
+          const active = item.match(pathname);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={active ? "page" : undefined}
+              className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[0.7rem] font-medium transition-colors focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-brand-500 ${
+                active ? "text-brand-500" : "text-muted hover:text-foreground"
+              }`}
+            >
+              {item.icon}
+              {item.label}
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
 export default function DashboardShell({ children }: { children: ReactNode }) {
   const { user, loading, signOutUser } = useAuth();
   const router = useRouter();
   const pathname = usePathname() ?? "/dashboard";
-  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
   }, [loading, user, router]);
-
-  // Close the mobile menu on route change.
-  useEffect(() => {
-    setMenuOpen(false);
-  }, [pathname]);
 
   if (loading || !user) {
     return <BrandSplash label="Loading your workspace…" />;
@@ -108,17 +125,6 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
     router.replace("/login");
   };
 
-  const UserChip = (
-    <div className="flex items-center gap-2 rounded-full border border-border bg-surface p-1 pr-3">
-      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full brand-gradient text-xs font-semibold text-white">
-        {initial}
-      </span>
-      <span className="max-w-[10rem] truncate text-sm text-muted-strong">
-        {user.email}
-      </span>
-    </div>
-  );
-
   return (
     <ToastProvider>
       <div className="min-h-dvh bg-background lg:flex">
@@ -128,10 +134,17 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
             <Logo size={30} />
           </Link>
           <div className="mt-8 flex-1">
-            <NavLinks pathname={pathname} />
+            <SidebarNav pathname={pathname} />
           </div>
           <div className="space-y-3 border-t border-border pt-4">
-            {UserChip}
+            <div className="flex items-center gap-2 rounded-full border border-border bg-surface p-1 pr-3">
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full brand-gradient text-xs font-semibold text-white">
+                {initial}
+              </span>
+              <span className="max-w-[10rem] truncate text-sm text-muted-strong">
+                {user.email}
+              </span>
+            </div>
             <div className="flex items-center justify-between">
               <ThemeToggle />
               <button
@@ -146,53 +159,31 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
         </aside>
 
         {/* Mobile top bar */}
-        <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur lg:hidden">
-          <div className="flex items-center justify-between gap-3 px-4 py-3">
-            <Link href="/" aria-label="Ziplink home">
-              <Logo size={28} />
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border bg-background/85 px-4 py-3 backdrop-blur lg:hidden">
+          <Link href="/" aria-label="Ziplink home">
+            <Logo size={28} />
+          </Link>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Link
+              href="/dashboard/settings"
+              aria-label="Account settings"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full brand-gradient text-xs font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+            >
+              {initial}
             </Link>
-            <div className="flex items-center gap-2">
-              <ThemeToggle />
-              <button
-                type="button"
-                onClick={() => setMenuOpen((o) => !o)}
-                aria-label={menuOpen ? "Close menu" : "Open menu"}
-                aria-expanded={menuOpen}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border-strong bg-surface text-muted-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
-              >
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  {menuOpen ? (
-                    <path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                  ) : (
-                    <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                  )}
-                </svg>
-              </button>
-            </div>
           </div>
-          {menuOpen ? (
-            <div className="border-t border-border px-4 py-3">
-              <NavLinks pathname={pathname} onNavigate={() => setMenuOpen(false)} />
-              <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
-                {UserChip}
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  className="rounded-[var(--radius-sm)] px-2 py-1.5 text-sm text-muted-strong hover:text-foreground"
-                >
-                  Sign out
-                </button>
-              </div>
-            </div>
-          ) : null}
         </header>
 
         {/* Content */}
         <div className="min-w-0 flex-1 lg:pl-60">
-          <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
+          <main className="mx-auto w-full max-w-5xl px-4 pb-24 pt-8 sm:px-6 sm:pt-10 lg:pb-10">
             {children}
           </main>
         </div>
+
+        {/* Mobile bottom navigation */}
+        <BottomTabs pathname={pathname} />
       </div>
       <Toaster />
     </ToastProvider>
