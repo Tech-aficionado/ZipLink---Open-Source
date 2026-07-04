@@ -236,21 +236,28 @@ html { scrollbar-width: none; -ms-overflow-style: none; }
 }
 
 /* --- Controls -------------------------------------------------------------- */
-.zip-field {
-  width: 100%;
-  border-radius: var(--radius);
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
-  color: var(--foreground);
-  padding: 0.8rem 1rem;
-  /* 16px prevents iOS Safari from zooming when the field is focused. */
-  font-size: 1rem;
-  line-height: 1.4;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-  outline: none;
+/* Declared inside `@layer components` so Tailwind utilities (which live in the
+   `utilities` layer) can override individual properties. Without the layer,
+   this unlayered rule's shorthand `padding`/`border-radius` would defeat
+   utilities like `pl-10` (search icon spacing) and `rounded-l-none` (seamless
+   alias prefix), since unlayered CSS always beats layered CSS. */
+@layer components {
+  .zip-field {
+    width: 100%;
+    border-radius: var(--radius);
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--foreground);
+    padding: 0.8rem 1rem;
+    /* 16px prevents iOS Safari from zooming when the field is focused. */
+    font-size: 1rem;
+    line-height: 1.4;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    outline: none;
+  }
+  .zip-field::placeholder { color: var(--muted); }
+  .zip-field:focus { border-color: var(--brand-500); box-shadow: var(--ring); }
 }
-.zip-field::placeholder { color: var(--muted); }
-.zip-field:focus { border-color: var(--brand-500); box-shadow: var(--ring); }
 
 /* --- Motion ---------------------------------------------------------------- */
 @keyframes zip-fade-up {
