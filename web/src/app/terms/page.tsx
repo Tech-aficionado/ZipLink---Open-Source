@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import LegalLayout, { LegalSection } from "@/components/LegalLayout";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — Ziplink",
+  title: "Terms of Service",
   description: "The terms that govern your use of Ziplink.",
 };
 
