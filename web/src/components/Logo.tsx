@@ -7,8 +7,9 @@ interface LogoProps {
 }
 
 /**
- * Ziplink brand mark: a rounded gradient tile with a lightning "zip" bolt,
- * optionally followed by the wordmark. Pure inline SVG — no external assets.
+ * Ziplink brand mark: a rounded gradient tile with a distinctive "Z" letterform
+ * drawn as a link path — two nodes (a long link shortened to a short one) joined
+ * by a zigzag. Unique to Ziplink; pure inline SVG, no external assets.
  */
 export default function Logo({
   className = "",
@@ -26,15 +27,15 @@ export default function Logo({
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth={1.9}
+          strokeWidth={2.6}
           strokeLinecap="round"
           strokeLinejoin="round"
-          style={{ width: size * 0.62, height: size * 0.62 }}
+          style={{ width: size * 0.64, height: size * 0.64 }}
         >
-          {/* Linkbolt: a chain link fused with a zip bolt */}
-          <path d="M9 15.2 6.4 17.8a3.4 3.4 0 0 1-4.8-4.8l2.6-2.6a3.4 3.4 0 0 1 4.8 0" />
-          <path d="M15 8.8l2.6-2.6a3.4 3.4 0 0 1 4.8 4.8l-2.6 2.6a3.4 3.4 0 0 1-4.8 0" />
-          <path d="M13.2 9 10 12.4h2.6L10.8 15" strokeWidth={1.7} />
+          {/* "Z" as a link path from top-left node to bottom-right node. */}
+          <path d="M7 7.3 H17 L7 16.7 H17" />
+          <circle cx="7" cy="7.3" r="2.05" fill="currentColor" stroke="none" />
+          <circle cx="17" cy="16.7" r="2.05" fill="currentColor" stroke="none" />
         </svg>
       </span>
       {withWordmark ? (
