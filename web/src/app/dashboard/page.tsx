@@ -11,7 +11,12 @@ import EditLinkModal from "@/components/EditLinkModal";
 import StatCard from "@/components/StatCard";
 import SearchInput from "@/components/SearchInput";
 import BulkActionBar from "@/components/BulkActionBar";
+import CampaignFields, { EMPTY_UTM } from "@/components/CampaignFields";
+import CsvImportPanel from "@/components/CsvImportPanel";
 import { downloadCsv, linksToCsv } from "@/lib/csv";
+import { CampaignValidationError, normalizeUtm, parseTagsText, type UtmValues } from "@/lib/campaign";
+import { browserTimeZone, localDateTimeToIso } from "@/lib/linkDates";
+import { normalizeLinkStatus } from "@/components/LifecycleStatusBadge";
 import {
   ALIAS_PATTERN,
   ApiError,
@@ -20,6 +25,7 @@ import {
   deleteLink,
   listLinks,
   type LinkItem,
+  type LinkStatus,
 } from "@/lib/api";
 
 const CSV_FILENAME = "ziplink-links.csv";
@@ -28,6 +34,7 @@ const BACKEND_UNCONFIGURED_MESSAGE =
   "Server not fully configured yet — add the Firebase service account key to start creating links.";
 
 type SortKey = "newest" | "oldest" | "clicks";
+type LifecycleFilter = "all" | LinkStatus;
 
 function pluralizeLinks(count: number): string {
   return count === 1 ? "link" : "links";
@@ -44,6 +51,12 @@ export default function LinksPage() {
 
   const [url, setUrl] = useState("");
   const [alias, setAlias] = useState("");
+  const [enabled, setEnabled] = useState(true);
+  const [startsAt, setStartsAt] = useState("");
+  const [expiresAt, setExpiresAt] = useState("");
+  const [tagsText, setTagsText] = useState("");
+  const [utm, setUtm] = useState<UtmValues>({ ...EMPTY_UTM });
+  const [timeZone, setTimeZone] = useState("local time");
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [lastCreated, setLastCreated] = useState<LinkItem | null>(null);
@@ -53,6 +66,7 @@ export default function LinksPage() {
 
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortKey>("newest");
+  const [lifecycleFilter, setLifecycleFilter] = useState<LifecycleFilter>("all");
   const [qrLink, setQrLink] = useState<LinkItem | null>(null);
   const [editLink, setEditLink] = useState<LinkItem | null>(null);
   const [selectedCodes, setSelectedCodes] = useState<Set<string>>(() => new Set());
@@ -60,7 +74,11 @@ export default function LinksPage() {
   const aliasPrefix = baseHostPrefix();
 
   useEffect(() => {
-    return () => window.clearTimeout(copyTimer.current);
+    const frame = window.requestAnimationFrame(() => setTimeZone(browserTimeZone()));
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(copyTimer.current);
+    };
   }, []);
 
   // Auto-focus the URL field on desktop only, so mobile keyboards don't pop up.
@@ -92,22 +110,27 @@ export default function LinksPage() {
   }, []);
 
   useEffect(() => {
-    if (user) void loadLinks();
+    if (!user) return;
+    const frame = window.requestAnimationFrame(() => void loadLinks());
+    return () => window.cancelAnimationFrame(frame);
   }, [user, loadLinks]);
 
   // Keep the selection in sync with the links that actually exist.
   useEffect(() => {
-    setSelectedCodes((prev) => {
-      if (prev.size === 0) return prev;
-      const valid = new Set(links.map((item) => item.shortCode));
-      let changed = false;
-      const next = new Set<string>();
-      prev.forEach((code) => {
-        if (valid.has(code)) next.add(code);
-        else changed = true;
+    const frame = window.requestAnimationFrame(() => {
+      setSelectedCodes((prev) => {
+        if (prev.size === 0) return prev;
+        const valid = new Set(links.map((item) => item.shortCode));
+        let changed = false;
+        const next = new Set<string>();
+        prev.forEach((code) => {
+          if (valid.has(code)) next.add(code);
+          else changed = true;
+        });
+        return changed ? next : prev;
       });
-      return changed ? next : prev;
     });
+    return () => window.cancelAnimationFrame(frame);
   }, [links]);
 
   const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
@@ -130,6 +153,10 @@ export default function LinksPage() {
       setFormError("Only http and https URLs are supported.");
       return;
     }
+    if (trimmed.length > 2048 || normalized.username || normalized.password || /[\u0000-\u001F\u007F]/.test(trimmed)) {
+      setFormError("Enter a safe URL without credentials or control characters (maximum 2048 characters).");
+      return;
+    }
 
     const trimmedAlias = alias.trim();
     if (trimmedAlias && !ALIAS_PATTERN.test(trimmedAlias)) {
@@ -137,21 +164,53 @@ export default function LinksPage() {
       return;
     }
 
+    const startsAtIso = localDateTimeToIso(startsAt);
+    const expiresAtIso = localDateTimeToIso(expiresAt);
+    if ((startsAt && !startsAtIso) || (expiresAt && !expiresAtIso)) {
+      setFormError("Enter valid start and expiry dates.");
+      return;
+    }
+    if (
+      startsAtIso &&
+      expiresAtIso &&
+      new Date(startsAtIso).getTime() >= new Date(expiresAtIso).getTime()
+    ) {
+      setFormError("Start time must be before expiry time.");
+      return;
+    }
+
+    let tags: string[];
+    let normalizedUtm;
+    try {
+      tags = parseTagsText(tagsText);
+      normalizedUtm = normalizeUtm(utm);
+    } catch (error) {
+      setFormError(
+        error instanceof CampaignValidationError ? error.message : "Check the campaign fields and try again.",
+      );
+      return;
+    }
+
     setCreating(true);
     try {
-      const created = await createLink(trimmed, trimmedAlias || undefined);
-      const newLink: LinkItem = {
-        shortCode: created.shortCode,
-        originalUrl: created.originalUrl,
-        shortUrl: created.shortUrl,
-        clicks: created.clicks,
-        createdAt: created.createdAt,
-        lastAccessedAt: null,
-      };
-      setLinks((prev) => [newLink, ...prev]);
-      setLastCreated(newLink);
+      const created = await createLink({
+        originalUrl: trimmed,
+        customCode: trimmedAlias || undefined,
+        enabled,
+        startsAt: startsAtIso,
+        expiresAt: expiresAtIso,
+        tags,
+        ...(normalizedUtm ? { utm: normalizedUtm } : {}),
+      });
+      setLinks((prev) => [created, ...prev]);
+      setLastCreated(created);
       setUrl("");
       setAlias("");
+      setEnabled(true);
+      setStartsAt("");
+      setExpiresAt("");
+      setTagsText("");
+      setUtm({ ...EMPTY_UTM });
       setBackendUnavailable(false);
       toast.success("Short link created");
     } catch (err) {
@@ -208,7 +267,7 @@ export default function LinksPage() {
       setLastCreated((prev) =>
         prev && prev.shortCode === updated.shortCode ? { ...prev, ...updated } : prev,
       );
-      toast.success("Destination updated");
+      toast.success("Link updated");
     },
     [toast],
   );
@@ -221,13 +280,18 @@ export default function LinksPage() {
   );
 
   const query = search.trim().toLowerCase();
-  const filteredLinks = query
+  const searchedLinks = query
     ? links.filter(
         (item) =>
           item.shortCode.toLowerCase().includes(query) ||
-          item.originalUrl.toLowerCase().includes(query),
+          item.originalUrl.toLowerCase().includes(query) ||
+          item.tags.some((tag) => tag.includes(query)),
       )
     : links;
+  const filteredLinks =
+    lifecycleFilter === "all"
+      ? searchedLinks
+      : searchedLinks.filter((item) => normalizeLinkStatus(item.status) === lifecycleFilter);
   const sortedLinks = sortLinks(filteredLinks, sort);
 
   const showList = !listLoading && !backendUnavailable && !listError && links.length > 0;
@@ -336,10 +400,11 @@ export default function LinksPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <div className="flex items-stretch">
+            <div className="grid min-w-0 grid-cols-[minmax(0,auto)_minmax(0,1fr)] overflow-hidden rounded-[var(--radius)] border border-border-strong bg-surface transition-[border-color,box-shadow] focus-within:border-brand-500 focus-within:shadow-[var(--ring)]">
               <span
-                className="inline-flex shrink-0 items-center rounded-l-[var(--radius)] border border-r-0 border-border-strong bg-surface-muted px-3 font-mono text-xs text-muted"
+                className="flex min-w-0 max-w-[45vw] items-center overflow-hidden text-ellipsis whitespace-nowrap bg-surface-muted px-3 font-mono text-xs text-muted sm:max-w-72"
                 aria-hidden="true"
+                title={aliasPrefix}
               >
                 {aliasPrefix}
               </span>
@@ -354,11 +419,60 @@ export default function LinksPage() {
                 autoCorrect="off"
                 spellCheck={false}
                 maxLength={32}
-                className="zip-field min-w-0 flex-1 rounded-l-none font-mono"
+                className="min-w-0 border-0 bg-transparent px-3 py-[0.8rem] font-mono text-base leading-[1.4] text-foreground outline-none placeholder:text-muted"
               />
             </div>
             <p id="alias-help" className="text-xs text-muted">{ALIAS_HELP}</p>
           </div>
+
+          <details className="rounded-[var(--radius)] border border-border bg-surface/60 px-4 py-3">
+            <summary className="cursor-pointer text-sm font-medium text-muted-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
+              Advanced controls
+            </summary>
+            <div className="mt-4 space-y-4">
+              <label className="flex cursor-pointer items-start justify-between gap-4">
+                <span>
+                  <span className="block text-sm font-medium text-foreground">Enable link</span>
+                  <span className="block text-xs text-muted">Turn this off to pause redirects.</span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={enabled}
+                  onChange={(event) => setEnabled(event.target.checked)}
+                  className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+                />
+              </label>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="text-xs font-medium text-muted-strong">
+                  Starts at (optional)
+                  <input
+                    type="datetime-local"
+                    value={startsAt}
+                    onChange={(event) => setStartsAt(event.target.value)}
+                    className="zip-field mt-1.5"
+                  />
+                </label>
+                <label className="text-xs font-medium text-muted-strong">
+                  Expires at (optional)
+                  <input
+                    type="datetime-local"
+                    value={expiresAt}
+                    onChange={(event) => setExpiresAt(event.target.value)}
+                    className="zip-field mt-1.5"
+                  />
+                </label>
+              </div>
+              <p className="text-xs text-muted">Times use your browser timezone: {timeZone}.</p>
+              <CampaignFields
+                idPrefix="create-campaign"
+                originalUrl={url}
+                tagsText={tagsText}
+                onTagsChange={setTagsText}
+                utm={utm}
+                onUtmChange={setUtm}
+              />
+            </div>
+          </details>
         </form>
 
         {formError ? (
@@ -389,6 +503,12 @@ export default function LinksPage() {
         ) : null}
       </section>
 
+      {user ? (
+        <div className="mt-4">
+          <CsvImportPanel onCompleted={() => void loadLinks()} />
+        </div>
+      ) : null}
+
       <div className="my-9 h-px w-full bg-border" />
 
       {showList ? (
@@ -417,10 +537,11 @@ export default function LinksPage() {
             ) : null}
           </div>
           {showList ? (
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-3">
               <div className="sm:w-56">
-                <SearchInput value={search} onChange={setSearch} placeholder="Search by code or URL…" />
+                <SearchInput value={search} onChange={setSearch} placeholder="Search by code, URL, or tag…" />
               </div>
+              <LifecycleFilterSelect value={lifecycleFilter} onChange={setLifecycleFilter} />
               <SortSelect value={sort} onChange={setSort} />
             </div>
           ) : null}
@@ -459,7 +580,14 @@ export default function LinksPage() {
         ) : links.length === 0 ? (
           <EmptyPanel title="No links yet" body="Paste a URL above to create your first Ziplink." />
         ) : sortedLinks.length === 0 ? (
-          <EmptyPanel title="No links match" body={`Nothing matches “${search.trim()}”. Try a different search.`} />
+          <EmptyPanel
+            title="No links match"
+            body={
+              query
+                ? `Nothing matches “${search.trim()}” with the selected lifecycle filter.`
+                : `No ${lifecycleFilter} links found. Try a different lifecycle filter.`
+            }
+          />
         ) : (
           <div className="space-y-3">
             {sortedLinks.map((link) => (
@@ -481,6 +609,7 @@ export default function LinksPage() {
 
       {showList && selectedCount > 0 ? (
         <BulkActionBar
+          key={selectedCount}
           count={selectedCount}
           onDeleteSelected={handleDeleteSelected}
           onExportSelected={handleExportSelected}
@@ -511,6 +640,34 @@ function toTime(value: string | null): number {
   return Number.isNaN(time) ? 0 : time;
 }
 
+function LifecycleFilterSelect({
+  value,
+  onChange,
+}: {
+  value: LifecycleFilter;
+  onChange: (value: LifecycleFilter) => void;
+}) {
+  return (
+    <div className="relative">
+      <label htmlFor="filter-links" className="sr-only">Filter links by lifecycle status</label>
+      <select
+        id="filter-links"
+        value={value}
+        onChange={(event) => onChange(event.target.value as LifecycleFilter)}
+        className="zip-field w-full cursor-pointer appearance-none pr-9 sm:w-40"
+      >
+        <option value="all">All statuses</option>
+        <option value="active">Active</option>
+        <option value="scheduled">Scheduled</option>
+        <option value="paused">Paused</option>
+        <option value="expired">Expired</option>
+        <option value="error">Error</option>
+      </select>
+      <SelectChevron />
+    </div>
+  );
+}
+
 function SortSelect({ value, onChange }: { value: SortKey; onChange: (value: SortKey) => void }) {
   return (
     <div className="relative">
@@ -525,12 +682,18 @@ function SortSelect({ value, onChange }: { value: SortKey; onChange: (value: Sor
         <option value="oldest">Oldest first</option>
         <option value="clicks">Most clicks</option>
       </select>
-      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted">
-        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </span>
+      <SelectChevron />
     </div>
+  );
+}
+
+function SelectChevron() {
+  return (
+    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted">
+      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </span>
   );
 }
 

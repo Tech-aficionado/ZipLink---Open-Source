@@ -10,10 +10,14 @@ import { AdminNotConfiguredError, UnauthorizedError } from '@/lib/firebaseAdmin'
  *   - AdminNotConfiguredError  -> 503 (backend not configured yet)
  *   - anything else            -> 500 (generic; details are never leaked)
  *
- * The raw error is logged server-side so unexpected failures remain
- * diagnosable without exposing internals to the client.
+ * Unexpected errors are logged by default and always return an opaque response.
+ * Sensitive workflows can disable logging so request-derived values are never
+ * written to logs while preserving the same client-facing behavior.
  */
-export function errorResponse(error: unknown): NextResponse {
+export function errorResponse(
+  error: unknown,
+  options: { log?: boolean } = {},
+): NextResponse {
   if (error instanceof UnauthorizedError) {
     return NextResponse.json({ error: error.message }, { status: 401 });
   }
@@ -24,8 +28,8 @@ export function errorResponse(error: unknown): NextResponse {
     );
   }
 
-  // Unexpected: log for observability, return an opaque 500.
-  console.error('[api] Unhandled error:', error);
+  // Unexpected: log for observability unless the caller handles sensitive input.
+  if (options.log !== false) console.error('[api] Unhandled error:', error);
   return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
 }
 

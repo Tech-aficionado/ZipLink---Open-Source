@@ -1,257 +1,148 @@
-import { NextResponse } from 'next/server';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { nanoid } from 'nanoid';
-import { getAuthFromRequest, getFirestore } from '@/lib/firebaseAdmin';
-import { errorResponse } from '@/lib/http';
+import { NextResponse } from "next/server";
+import { nanoid } from "nanoid";
+import { getAuthFromRequest, getFirestore } from "@/lib/firebaseAdmin";
+import { errorResponse } from "@/lib/http";
+import {
+  CampaignValidationError,
+  mergeUtmIntoUrl,
+  normalizeTags,
+  normalizeUtm,
+} from "@/lib/campaign";
+import {
+  MAX_URL_LENGTH,
+  hasValidRange,
+  isValidDestination,
+  parseOptionalIso,
+} from "@/lib/linkControls";
+import {
+  buildLinkDocument,
+  createLinkRecord,
+  isAlreadyExistsError,
+  serializeLink,
+  validateCustomCode,
+  type NewLinkRecord,
+} from "@/lib/linkRecords";
 
-export const runtime = 'nodejs';
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-const LINKS_COLLECTION = 'links';
+const LINKS_COLLECTION = "links";
 const SHORT_CODE_LENGTH = 7;
 const MAX_COLLISION_RETRIES = 5;
-// Upper bound on the accepted originalUrl length. Browsers/proxies commonly
-// cap URLs around 2000 chars; 2048 is a safe, generous limit.
-const MAX_URL_LENGTH = 2048;
-
-// Custom alias rules: 3-32 chars of letters, numbers, hyphen or underscore.
-const CUSTOM_CODE_PATTERN = /^[a-zA-Z0-9_-]{3,32}$/;
-// Codes that would collide with real routes / internals, plus aliases we
-// reserve for our own use (e.g. marketing/demo links). Compared lowercase.
-const RESERVED_CODES = new Set<string>([
-  'api',
-  'health',
-  'login',
-  'dashboard',
-  '_next',
-  'favicon.ico',
-  // Reserved for Ziplink's own use.
-  'launch',
+const CREATE_FIELDS = new Set([
+  "originalUrl", "customCode", "enabled", "startsAt", "expiresAt", "tags", "utm",
 ]);
 
-/**
- * Detects whether an error thrown by firebase-admin's `docRef.create()`
- * indicates the document already exists. firebase-admin surfaces this as a
- * gRPC ALREADY_EXISTS status (numeric code 6); some layers expose the string
- * code 'already-exists'. We also fall back to a message test for robustness.
- */
-function isAlreadyExistsError(error: unknown): boolean {
-  if (typeof error === 'object' && error !== null) {
-    const code = (error as { code?: unknown }).code;
-    if (code === 6 || code === 'already-exists') {
-      return true;
-    }
-    const message = (error as { message?: unknown }).message;
-    if (typeof message === 'string' && message.toLowerCase().includes('already exists')) {
-      return true;
-    }
-  }
-  return false;
-}
+const hasOwn = (value: object, key: PropertyKey): boolean =>
+  Object.prototype.hasOwnProperty.call(value, key);
 
-/**
- * Firestore document shape for the `links` collection.
- * The document id is always the shortCode.
- */
-interface LinkDocument {
-  shortCode: string;
-  originalUrl: string;
-  ownerUid: string;
-  ownerEmail: string;
-  createdAt: Timestamp | FieldValue | null;
-  clicks: number;
-  lastAccessedAt: Timestamp | null;
-}
-
-/**
- * Builds the absolute short URL from a code using the configured base URL.
- */
-function buildShortUrl(shortCode: string): string {
-  // Short links live on the dedicated short domain (e.g. zl.ash-labs.tech),
-  // which may differ from the app origin. Fall back to the app base, then ''.
-  const base =
-    process.env.NEXT_PUBLIC_SHORT_BASE_URL ?? process.env.NEXT_PUBLIC_BASE_URL ?? '';
-  const trimmed = base.replace(/\/+$/, '');
-  return `${trimmed}/${shortCode}`;
-}
-
-/**
- * Validates that a string is a well-formed http(s) URL.
- */
-function isValidHttpUrl(value: string): boolean {
-  let parsed: URL;
-  try {
-    parsed = new URL(value);
-  } catch {
-    return false;
-  }
-  return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-}
-
-/**
- * Converts a Firestore Timestamp (or null) to an ISO 8601 string, or null.
- */
-function timestampToIso(value: Timestamp | null | undefined): string | null {
-  if (!value) {
-    return null;
-  }
-  return value.toDate().toISOString();
-}
-
-/**
- * POST /api/links
- * Creates a new short link owned by the authenticated user.
- */
 export async function POST(req: Request): Promise<NextResponse> {
   try {
     const { uid, email } = await getAuthFromRequest(req);
-
     let body: unknown;
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+    if (typeof body !== "object" || body === null || Array.isArray(body)) {
+      return NextResponse.json({ error: "A valid http(s) originalUrl is required" }, { status: 400 });
     }
 
-    // Reject non-object bodies (arrays, strings, numbers, null) cleanly.
-    if (typeof body !== 'object' || body === null || Array.isArray(body)) {
-      return NextResponse.json(
-        { error: 'A valid http(s) originalUrl is required' },
-        { status: 400 },
-      );
+    const input = body as Record<string, unknown>;
+    if (Object.keys(input).some((field) => !CREATE_FIELDS.has(field))) {
+      return NextResponse.json({ error: "Request contains unsupported fields" }, { status: 400 });
     }
 
-    const rawOriginalUrl = (body as { originalUrl?: unknown }).originalUrl;
-
-    if (typeof rawOriginalUrl !== 'string') {
-      return NextResponse.json(
-        { error: 'A valid http(s) originalUrl is required' },
-        { status: 400 },
-      );
+    const rawUrl = typeof input.originalUrl === "string" ? input.originalUrl.trim() : "";
+    const rawUrlTooLong = rawUrl.length > MAX_URL_LENGTH;
+    if (!isValidDestination(rawUrl)) {
+      const message = rawUrlTooLong
+        ? `originalUrl must be at most ${MAX_URL_LENGTH} characters`
+        : "A valid http(s) originalUrl without credentials is required";
+      return NextResponse.json({ error: message }, { status: 400 });
     }
 
-    const originalUrl = rawOriginalUrl.trim();
-
-    if (originalUrl.length > MAX_URL_LENGTH) {
-      return NextResponse.json(
-        { error: `originalUrl must be at most ${MAX_URL_LENGTH} characters` },
-        { status: 400 },
-      );
+    let tags: string[];
+    let utm;
+    let originalUrl = rawUrl;
+    try {
+      tags = hasOwn(input, "tags") ? normalizeTags(input.tags) : [];
+      utm = hasOwn(input, "utm") ? normalizeUtm(input.utm) : null;
+      if (hasOwn(input, "utm")) originalUrl = mergeUtmIntoUrl(rawUrl, utm);
+    } catch (error) {
+      if (error instanceof CampaignValidationError) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+      throw error;
     }
 
-    if (!isValidHttpUrl(originalUrl)) {
-      return NextResponse.json(
-        { error: 'A valid http(s) originalUrl is required' },
-        { status: 400 },
-      );
+    if (input.enabled !== undefined && typeof input.enabled !== "boolean") {
+      return NextResponse.json({ error: "enabled must be a boolean" }, { status: 400 });
+    }
+    const startsAt = parseOptionalIso(input.startsAt);
+    const expiresAt = parseOptionalIso(input.expiresAt);
+    if (startsAt === undefined || expiresAt === undefined) {
+      return NextResponse.json({ error: "startsAt and expiresAt must be valid ISO date strings" }, { status: 400 });
+    }
+    if (!hasValidRange(startsAt, expiresAt)) {
+      return NextResponse.json({ error: "startsAt must be earlier than expiresAt" }, { status: 400 });
     }
 
-    // Optional custom alias. When present it must be a string; reject other
-    // types (number/object/etc.) as a bad request.
-    const rawCustomCode = (body as { customCode?: unknown }).customCode;
-
-    if (rawCustomCode !== undefined && rawCustomCode !== null && typeof rawCustomCode !== 'string') {
-      return NextResponse.json(
-        { error: 'Alias must be 3-32 chars: letters, numbers, - or _' },
-        { status: 400 },
-      );
+    const rawCustomCode = input.customCode;
+    if (rawCustomCode !== undefined && rawCustomCode !== null && typeof rawCustomCode !== "string") {
+      return NextResponse.json({ error: "Alias must be 3-32 chars: letters, numbers, - or _" }, { status: 400 });
+    }
+    const customCode = typeof rawCustomCode === "string" ? rawCustomCode.trim() : "";
+    if (customCode) {
+      const codeError = validateCustomCode(customCode);
+      if (codeError) return NextResponse.json({ error: codeError }, { status: 400 });
     }
 
-    const customCode = typeof rawCustomCode === 'string' ? rawCustomCode.trim() : '';
-
-    const db = getFirestore();
-    const collection = db.collection(LINKS_COLLECTION);
-
-    /**
-     * Builds the stored document for a given code. Shared by the custom-alias
-     * and generated-code paths so the persisted shape stays identical.
-     */
-    const buildDocData = (code: string): LinkDocument => ({
-      shortCode: code,
+    const collection = getFirestore().collection(LINKS_COLLECTION);
+    const record = (shortCode: string): NewLinkRecord => ({
+      shortCode,
       originalUrl,
       ownerUid: uid,
       ownerEmail: email,
-      createdAt: FieldValue.serverTimestamp(),
-      clicks: 0,
-      lastAccessedAt: null,
+      tags,
+      utm,
+      enabled: input.enabled !== false,
+      startsAt,
+      expiresAt,
     });
 
-    let shortCode = '';
-
-    if (customCode.length > 0) {
-      // Custom alias path: validate, reject reserved names, then attempt a
-      // single create. We do NOT retry with a different code — the user asked
-      // for this exact alias.
-      if (!CUSTOM_CODE_PATTERN.test(customCode)) {
-        return NextResponse.json(
-          { error: 'Alias must be 3-32 chars: letters, numbers, - or _' },
-          { status: 400 },
-        );
-      }
-
-      if (RESERVED_CODES.has(customCode.toLowerCase())) {
-        return NextResponse.json({ error: 'That alias is reserved' }, { status: 400 });
-      }
-
+    let shortCode = "";
+    if (customCode) {
       try {
-        await collection.doc(customCode).create(buildDocData(customCode));
+        await createLinkRecord(collection.doc(customCode), record(customCode));
         shortCode = customCode;
-      } catch (createError) {
-        if (isAlreadyExistsError(createError)) {
-          return NextResponse.json({ error: 'That alias is already taken' }, { status: 409 });
+      } catch (error) {
+        if (isAlreadyExistsError(error)) {
+          return NextResponse.json({ error: "That alias is already taken" }, { status: 409 });
         }
-        // Any other failure is an unexpected server error.
-        return errorResponse(createError);
+        throw error;
       }
     } else {
-      // Auto-generated path: generate a unique code, retrying on the (very
-      // unlikely) collision.
-      let created = false;
-
       for (let attempt = 0; attempt < MAX_COLLISION_RETRIES; attempt += 1) {
         const candidate = nanoid(SHORT_CODE_LENGTH);
-        const docRef = collection.doc(candidate);
-
         try {
-          // create() fails if the document already exists, giving us atomic
-          // collision detection.
-          await docRef.create(buildDocData(candidate));
+          await createLinkRecord(collection.doc(candidate), record(candidate));
           shortCode = candidate;
-          created = true;
           break;
-        } catch (genError) {
-          // Only retry on an actual collision. Any other failure (e.g. a
-          // Firestore outage) must propagate so we don't burn all retries and
-          // then mislabel a real outage as "couldn't generate a code".
-          if (isAlreadyExistsError(genError)) {
-            continue;
-          }
-          throw genError;
+        } catch (error) {
+          if (!isAlreadyExistsError(error)) throw error;
         }
       }
-
-      if (!created) {
-        return NextResponse.json(
-          { error: 'Failed to generate a unique short code, please retry' },
-          { status: 500 },
-        );
+      if (!shortCode) {
+        return NextResponse.json({ error: "Failed to generate a unique short code, please retry" }, { status: 500 });
       }
     }
 
-    // Read back the stored doc so we can return the resolved createdAt value.
     const snapshot = await collection.doc(shortCode).get();
-    const stored = snapshot.data() as LinkDocument | undefined;
-    const createdAt = timestampToIso(
-      stored?.createdAt instanceof Timestamp ? stored.createdAt : null,
-    );
-
     return NextResponse.json(
-      {
-        shortCode,
-        shortUrl: buildShortUrl(shortCode),
-        originalUrl,
-        clicks: 0,
-        createdAt,
-      },
+      serializeLink(shortCode, snapshot.data() ?? buildLinkDocument(record(shortCode))),
       { status: 201 },
     );
   } catch (error) {
@@ -259,40 +150,13 @@ export async function POST(req: Request): Promise<NextResponse> {
   }
 }
 
-/**
- * GET /api/links
- * Lists the authenticated user's links, newest first.
- */
 export async function GET(req: Request): Promise<NextResponse> {
   try {
     const { uid } = await getAuthFromRequest(req);
-
-    const db = getFirestore();
-    // Equality filter only (no composite index required); sort in memory below.
-    const querySnapshot = await db
-      .collection(LINKS_COLLECTION)
-      .where('ownerUid', '==', uid)
-      .get();
-
-    const links = querySnapshot.docs.map((doc) => {
-      const data = doc.data() as LinkDocument;
-      return {
-        shortCode: doc.id,
-        originalUrl: data.originalUrl,
-        shortUrl: buildShortUrl(doc.id),
-        clicks: data.clicks ?? 0,
-        createdAt: timestampToIso(data.createdAt instanceof Timestamp ? data.createdAt : null),
-        lastAccessedAt: timestampToIso(data.lastAccessedAt ?? null),
-      };
-    });
-
-    // Newest first. Links without a resolved createdAt sort last.
-    links.sort((a, b) => {
-      const ta = a.createdAt ? Date.parse(a.createdAt) : 0;
-      const tb = b.createdAt ? Date.parse(b.createdAt) : 0;
-      return tb - ta;
-    });
-
+    const snapshot = await getFirestore().collection(LINKS_COLLECTION).where("ownerUid", "==", uid).get();
+    const now = Date.now();
+    const links = snapshot.docs.map((doc) => serializeLink(doc.id, doc.data(), now));
+    links.sort((a, b) => (b.createdAt ? Date.parse(b.createdAt) : 0) - (a.createdAt ? Date.parse(a.createdAt) : 0));
     return NextResponse.json({ links }, { status: 200 });
   } catch (error) {
     return errorResponse(error);

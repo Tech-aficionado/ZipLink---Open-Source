@@ -3,6 +3,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import Spinner from "@/components/Spinner";
+import LifecycleStatusBadge from "@/components/LifecycleStatusBadge";
+import { formatLifecycleDate } from "@/lib/linkDates";
 import type { LinkItem } from "@/lib/api";
 
 interface LinkCardProps {
@@ -151,7 +153,7 @@ export default function LinkCard({
 
         <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <a
                 href={link.shortUrl}
                 target="_blank"
@@ -160,6 +162,7 @@ export default function LinkCard({
               >
                 {displayShort(link.shortUrl)}
               </a>
+              <LifecycleStatusBadge status={link.status} />
               <button
                 type="button"
                 onClick={() => copyValue(link.shortUrl, "short")}
@@ -191,6 +194,16 @@ export default function LinkCard({
             >
               {link.originalUrl}
             </a>
+
+            {link.tags.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Tags">
+                {link.tags.map((tag) => (
+                  <span key={tag} className="rounded-full bg-brand-500/10 px-2 py-0.5 text-xs font-medium text-brand-600 dark:text-brand-300">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            ) : null}
 
             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted">
               <span className="inline-flex items-center gap-1.5">
@@ -300,6 +313,40 @@ export default function LinkCard({
                   label="Copy original URL"
                 />
               </div>
+            </DetailRow>
+
+            <DetailRow label="Status">
+              <LifecycleStatusBadge status={link.status} />
+            </DetailRow>
+
+            <DetailRow label="Tags">
+              <span className="text-sm text-foreground">
+                {link.tags.length > 0 ? link.tags.join(", ") : "None"}
+              </span>
+            </DetailRow>
+
+            <DetailRow label="Campaign">
+              <span className="text-sm text-foreground">
+                {link.utm ? `${link.utm.source} / ${link.utm.medium} / ${link.utm.campaign}` : "None"}
+              </span>
+            </DetailRow>
+
+            <DetailRow label="Enabled">
+              <span className="text-sm text-foreground">
+                {typeof link.enabled === "boolean" ? (link.enabled ? "Yes" : "No") : link.enabled == null ? "Yes (legacy default)" : "Invalid"}
+              </span>
+            </DetailRow>
+
+            <DetailRow label="Starts">
+              <span className="text-sm text-foreground">
+                {formatLifecycleDate(link.startsAt, "Immediately")}
+              </span>
+            </DetailRow>
+
+            <DetailRow label="Expires">
+              <span className="text-sm text-foreground">
+                {formatLifecycleDate(link.expiresAt, "Never")}
+              </span>
             </DetailRow>
 
             <DetailRow label="Created">

@@ -1,8 +1,15 @@
 import { auth } from "@/lib/firebaseClient";
 
-/**
- * A single shortened link as returned by the API contract.
- */
+export type LinkStatus = "active" | "scheduled" | "paused" | "expired" | "error";
+
+export interface UtmValues {
+  source: string;
+  medium: string;
+  campaign: string;
+  term: string;
+  content: string;
+}
+
 export interface LinkItem {
   shortCode: string;
   originalUrl: string;
@@ -10,25 +17,37 @@ export interface LinkItem {
   clicks: number;
   createdAt: string | null;
   lastAccessedAt: string | null;
+  enabled: boolean;
+  startsAt: string | null;
+  expiresAt: string | null;
+  status: LinkStatus;
+  tags: string[];
+  utm: UtmValues | null;
 }
 
-interface CreateLinkResponse {
-  shortCode: string;
-  shortUrl: string;
+export interface CreateLinkOptions {
   originalUrl: string;
-  clicks: number;
-  createdAt: string | null;
+  customCode?: string;
+  enabled?: boolean;
+  startsAt?: string | null;
+  expiresAt?: string | null;
+  tags?: string[];
+  utm?: UtmValues | null;
+}
+
+export interface LinkUpdates {
+  originalUrl?: string;
+  enabled?: boolean;
+  startsAt?: string | null;
+  expiresAt?: string | null;
+  tags?: string[];
+  utm?: UtmValues | null;
 }
 
 interface ListLinksResponse {
   links: LinkItem[];
 }
 
-/**
- * Error thrown for any non-2xx API response. Carries the HTTP status so
- * callers can react to specific cases (e.g. a 503 when the backend/Firebase
- * Admin is not configured yet).
- */
 export class ApiError extends Error {
   readonly status: number;
 
@@ -39,16 +58,9 @@ export class ApiError extends Error {
   }
 }
 
-// Short-link domain (e.g. https://zl.ash-labs.tech), used only to display the
-// alias prefix chip. Falls back to the app origin, then relative.
 const SHORT_BASE_URL =
   process.env.NEXT_PUBLIC_SHORT_BASE_URL ?? process.env.NEXT_PUBLIC_BASE_URL ?? "";
 
-/**
- * The display host used for the alias prefix chip (e.g. "zl.ash-labs.tech/").
- * Derived from the short-link domain: strips the protocol and trailing slash,
- * then appends a single "/". Falls back to "/" when unset.
- */
 export function baseHostPrefix(): string {
   const raw = SHORT_BASE_URL.trim();
   if (!raw) return "/";
@@ -56,146 +68,80 @@ export function baseHostPrefix(): string {
   return `${withoutProtocol}/`;
 }
 
-/** Client-side alias validation mirroring the server contract. */
 export const ALIAS_PATTERN = /^[a-zA-Z0-9_-]{3,32}$/;
-
-// Abort in-flight requests that hang longer than this so the UI never stalls
-// forever waiting on a dead connection.
 const REQUEST_TIMEOUT_MS = 15000;
 
 async function authHeaders(): Promise<HeadersInit> {
   const currentUser = auth.currentUser;
-  if (!currentUser) {
-    throw new ApiError("You must be signed in to do that.", 401);
-  }
-  let token: string;
+  if (!currentUser) throw new ApiError("You must be signed in to do that.", 401);
   try {
-    token = await currentUser.getIdToken();
+    return { Authorization: `Bearer ${await currentUser.getIdToken()}` };
   } catch {
-    // Token refresh can fail if the session was revoked or the device is
-    // offline. Normalize to an ApiError so callers handle it uniformly.
     throw new ApiError("Couldn't verify your session. Please sign in again.", 401);
   }
-  return {
-    Authorization: `Bearer ${token}`,
-  };
 }
 
 async function parseError(response: Response): Promise<never> {
   let message = `Request failed with status ${response.status}`;
   try {
     const data = (await response.json()) as { error?: string };
-    if (data && typeof data.error === "string" && data.error.length > 0) {
-      message = data.error;
-    }
+    if (data && typeof data.error === "string" && data.error.length > 0) message = data.error;
   } catch {
-    // Response had no JSON body; fall back to the default message.
+    // The response had no JSON body.
   }
   throw new ApiError(message, response.status);
 }
 
-/**
- * Wraps `fetch` with a timeout and normalizes every low-level failure
- * (offline, DNS, CORS, aborted/timed-out request) into an {@link ApiError}.
- * This guarantees callers only ever catch an ApiError — never a raw
- * `TypeError` — so their status-based branching (e.g. 503 handling) stays
- * reliable. Non-2xx responses are converted via {@link parseError}. Returns
- * the raw Response so the caller can read the body on success.
- */
 async function request(path: string, init: RequestInit = {}): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
   let response: Response;
   try {
     response = await fetch(path, { ...init, signal: controller.signal });
-  } catch (err) {
-    if (err instanceof ApiError) throw err;
-    if (err instanceof DOMException && err.name === "AbortError") {
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    if (error instanceof DOMException && error.name === "AbortError") {
       throw new ApiError("The request timed out. Please try again.", 0);
     }
     throw new ApiError("Network error. Check your connection and try again.", 0);
   } finally {
     clearTimeout(timer);
   }
-
-  // 204 (No Content) is `ok`, so this correctly skips parseError for deletes.
-  if (!response.ok) {
-    await parseError(response);
-  }
+  if (!response.ok) await parseError(response);
   return response;
 }
 
-/**
- * Create a new short link for the given original URL.
- *
- * When {@link customCode} is provided (non-empty), it is sent as the desired
- * alias. Callers can inspect a thrown {@link ApiError} to react to specific
- * cases: 409 (alias already taken) and 400 (invalid/reserved alias).
- */
-export async function createLink(
-  originalUrl: string,
-  customCode?: string,
-): Promise<CreateLinkResponse> {
+export async function createLink(options: CreateLinkOptions): Promise<LinkItem> {
   const headers = await authHeaders();
-
-  const payload: { originalUrl: string; customCode?: string } = { originalUrl };
-  const alias = customCode?.trim();
-  if (alias) {
-    payload.customCode = alias;
-  }
-
-  const response = await request(`/api/links`, {
+  const payload: CreateLinkOptions = { ...options, originalUrl: options.originalUrl.trim() };
+  if (payload.customCode) payload.customCode = payload.customCode.trim();
+  const response = await request("/api/links", {
     method: "POST",
-    headers: {
-      ...headers,
-      "Content-Type": "application/json",
-    },
+    headers: { ...headers, "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-
-  return (await response.json()) as CreateLinkResponse;
+  return (await response.json()) as LinkItem;
 }
 
-/**
- * List the current user's links, newest first.
- */
 export async function listLinks(): Promise<LinkItem[]> {
   const headers = await authHeaders();
-  const response = await request(`/api/links`, {
-    method: "GET",
-    headers,
-  });
-
+  const response = await request("/api/links", { method: "GET", headers });
   const data = (await response.json()) as ListLinksResponse;
   return data.links ?? [];
 }
 
-/**
- * Delete one of the current user's links by short code.
- */
 export async function deleteLink(shortCode: string): Promise<void> {
   const headers = await authHeaders();
-  await request(`/api/links/${encodeURIComponent(shortCode)}`, {
-    method: "DELETE",
-    headers,
-  });
+  await request(`/api/links/${encodeURIComponent(shortCode)}`, { method: "DELETE", headers });
 }
 
-/**
- * Update the destination URL of one of the current user's links.
- */
-export async function updateLink(
-  shortCode: string,
-  originalUrl: string,
-): Promise<LinkItem> {
+export async function updateLink(shortCode: string, updates: LinkUpdates): Promise<LinkItem> {
   const headers = await authHeaders();
   const response = await request(`/api/links/${encodeURIComponent(shortCode)}`, {
     method: "PATCH",
     headers: { ...headers, "Content-Type": "application/json" },
-    body: JSON.stringify({ originalUrl }),
+    body: JSON.stringify(updates),
   });
-
   return (await response.json()) as LinkItem;
 }
 
@@ -253,4 +199,76 @@ export async function getLinkAnalytics(shortCode: string): Promise<LinkAnalytics
     { headers },
   );
   return (await response.json()) as LinkAnalytics;
+}
+
+
+/* -------------------------------------------------------------------------- */
+/* CSV imports                                                                */
+/* -------------------------------------------------------------------------- */
+
+export type ImportJobStatus = "pending" | "processing" | "completed";
+export type ImportRowStatus = "pending" | "success" | "error" | "invalid";
+
+export interface ImportRowOutcome {
+  rowNumber: number;
+  input: {
+    originalUrl: string;
+    customCode: string | null;
+    tags: string[];
+    enabled: boolean;
+    startsAt: string | null;
+    expiresAt: string | null;
+    [key: string]: unknown;
+  };
+  status: ImportRowStatus;
+  error: string | null;
+  shortCode: string | null;
+  shortUrl: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface ImportJob {
+  jobId: string;
+  status: ImportJobStatus;
+  totalRows: number;
+  processedRows: number;
+  succeededRows: number;
+  failedRows: number;
+  nextRow: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+  outcomes?: ImportRowOutcome[];
+}
+
+export async function listImportJobs(): Promise<ImportJob[]> {
+  const headers = await authHeaders();
+  const response = await request("/api/imports", { headers });
+  const data = (await response.json()) as { jobs?: ImportJob[] };
+  return data.jobs ?? [];
+}
+
+export async function createImportJob(records: Record<string, unknown>[]): Promise<ImportJob> {
+  const headers = await authHeaders();
+  const response = await request("/api/imports", {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ records }),
+  });
+  return (await response.json()) as ImportJob;
+}
+
+export async function getImportJob(jobId: string): Promise<ImportJob> {
+  const headers = await authHeaders();
+  const response = await request(`/api/imports/${encodeURIComponent(jobId)}`, { headers });
+  return (await response.json()) as ImportJob;
+}
+
+export async function processImportJob(jobId: string): Promise<ImportJob> {
+  const headers = await authHeaders();
+  const response = await request(`/api/imports/${encodeURIComponent(jobId)}/process`, {
+    method: "POST",
+    headers,
+  });
+  return (await response.json()) as ImportJob;
 }

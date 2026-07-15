@@ -17,9 +17,14 @@ const CSV_COLUMNS = [
  * contains a comma, quote, or newline, doubling any embedded quotes. Nullish
  * values become an empty field.
  */
-function escapeField(value: string | number | null | undefined): string {
+function spreadsheetSafe(value: string | number | null | undefined): string {
   if (value === null || value === undefined) return "";
-  const str = String(value);
+  const raw = String(value);
+  return typeof value === "string" && /^\s*[=+\-@]/.test(raw) ? `'${raw}` : raw;
+}
+
+function escapeField(value: string | number | null | undefined): string {
+  const str = spreadsheetSafe(value);
   if (/[",\r\n]/.test(str)) {
     return `"${str.replace(/"/g, '""')}"`;
   }
@@ -66,4 +71,29 @@ export function downloadCsv(filename: string, content: string): void {
   document.body.removeChild(anchor);
   // Give the browser a tick to start the download before releasing the URL.
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+
+/** Build a formula-safe, immutable row-outcome report for a CSV import. */
+export function importReportToCsv(
+  outcomes: Array<{
+    rowNumber: number;
+    status: string;
+    input: { originalUrl?: string; customCode?: string | null };
+    shortUrl?: string | null;
+    error?: string | null;
+  }>,
+): string {
+  const header = "rowNumber,status,originalUrl,customCode,shortUrl,error";
+  const rows = outcomes.map((outcome) =>
+    [
+      escapeField(outcome.rowNumber),
+      escapeField(outcome.status),
+      escapeField(outcome.input?.originalUrl),
+      escapeField(outcome.input?.customCode),
+      escapeField(outcome.shortUrl),
+      escapeField(outcome.error),
+    ].join(","),
+  );
+  return [header, ...rows].join("\r\n");
 }
