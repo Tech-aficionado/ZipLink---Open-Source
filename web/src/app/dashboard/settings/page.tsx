@@ -53,7 +53,8 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    void loadCount();
+    const frame = window.requestAnimationFrame(() => void loadCount());
+    return () => window.cancelAnimationFrame(frame);
   }, [loadCount]);
 
   const handleExport = async () => {

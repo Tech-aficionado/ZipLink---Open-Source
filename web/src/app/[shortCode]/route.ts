@@ -1,77 +1,71 @@
-import { NextResponse } from 'next/server';
-import { FieldValue } from 'firebase-admin/firestore';
-import { getFirestore, AdminNotConfiguredError } from '@/lib/firebaseAdmin';
-import { parseUserAgent } from '@/lib/ua';
+import { NextResponse } from "next/server";
+import { FieldValue } from "firebase-admin/firestore";
+import { getFirestore } from "@/lib/firebaseAdmin";
+import { isValidDestination, readLinkControls } from "@/lib/linkControls";
+import { parseUserAgent } from "@/lib/ua";
 
-export const runtime = 'nodejs';
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-const LINKS_COLLECTION = 'links';
-const CLICKS_COLLECTION = 'clicks';
+const LINKS_COLLECTION = "links";
+const CLICKS_COLLECTION = "clicks";
+const VALID_SHORT_CODE = /^[A-Za-z0-9_-]{1,64}$/;
+const NO_STORE_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0",
+  Pragma: "no-cache",
+  Expires: "0",
+};
 
 interface RouteContext {
   params: Promise<{ shortCode: string }>;
 }
 
-interface LinkDocument {
-  originalUrl: string;
-  ownerUid?: string;
+function statusPage(status: number, title: string, message: string): NextResponse {
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${title} · Ziplink</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#06060b;color:#f2f3fb;font:16px/1.5 system-ui,sans-serif}main{width:min(32rem,calc(100% - 2rem));padding:2rem;border:1px solid #2e2e50;border-radius:1rem;background:#0f0f1a;text-align:center;box-shadow:0 24px 60px #0008}b{display:inline-block;margin-bottom:1rem;font-size:1.25rem;background:linear-gradient(120deg,#8188fb,#22d3ee);color:transparent;background-clip:text}h1{margin:.25rem 0;font-size:1.5rem}p{margin:.5rem 0 0;color:#bcbcd6}</style></head><body><main><b>Ziplink</b><h1>${title}</h1><p>${message}</p></main></body></html>`;
+  return new NextResponse(html, {
+    status,
+    headers: { ...NO_STORE_HEADERS, "Content-Type": "text/html; charset=utf-8" },
+  });
 }
 
-// Short codes are nanoid / custom-alias values. Anything else can't exist.
-const VALID_SHORT_CODE = /^[A-Za-z0-9_-]{1,64}$/;
-
-/**
- * GET /[shortCode]
- * PUBLIC. Redirects to the original URL (301) and records a click event with
- * lightweight, privacy-conscious metadata (device, browser, referrer host,
- * country) for analytics.
- */
 export async function GET(req: Request, ctx: RouteContext): Promise<NextResponse> {
   const { shortCode } = await ctx.params;
-
-  if (typeof shortCode !== 'string' || !VALID_SHORT_CODE.test(shortCode)) {
-    return new NextResponse('Not found', { status: 404 });
-  }
-
-  let db;
-  try {
-    db = getFirestore();
-  } catch (error) {
-    if (error instanceof AdminNotConfiguredError) {
-      return NextResponse.json({ error: 'Firebase Admin not configured' }, { status: 503 });
-    }
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  if (typeof shortCode !== "string" || !VALID_SHORT_CODE.test(shortCode)) {
+    return statusPage(404, "Link not found", "This short link is unavailable.");
   }
 
   try {
+    const db = getFirestore();
     const docRef = db.collection(LINKS_COLLECTION).doc(shortCode);
     const snapshot = await docRef.get();
+    if (!snapshot.exists) return statusPage(404, "Link not found", "This short link is unavailable.");
 
-    if (!snapshot.exists) {
-      return new NextResponse('Not found', { status: 404 });
+    const data = snapshot.data() as Record<string, unknown> | undefined;
+    if (!data) return statusPage(503, "Link unavailable", "Please try again later.");
+
+    const lifecycle = readLinkControls(data);
+    if (lifecycle.status === "error" || !isValidDestination(data.originalUrl)) {
+      return statusPage(503, "Link unavailable", "Please try again later.");
+    }
+    if (lifecycle.status === "paused") {
+      return statusPage(404, "Link paused", "This link is not currently available.");
+    }
+    if (lifecycle.status === "scheduled") {
+      return statusPage(404, "Link not active yet", `This link will be available at ${lifecycle.startsAt}.`);
+    }
+    if (lifecycle.status === "expired") {
+      return statusPage(410, "Link expired", "This link is no longer available.");
     }
 
-    const data = snapshot.data() as LinkDocument | undefined;
-    if (!data || typeof data.originalUrl !== 'string') {
-      return new NextResponse('Not found', { status: 404 });
-    }
-
-    // Record the visit + a click event. Non-fatal: never block the redirect.
-    const ua = parseUserAgent(req.headers.get('user-agent'));
-    const ref = req.headers.get('referer');
-    const country =
-      req.headers.get('x-vercel-ip-country') ??
-      req.headers.get('cf-ipcountry') ??
-      null;
-
-    const writes: Promise<unknown>[] = [
-      docRef.update({
-        clicks: FieldValue.increment(1),
-        lastAccessedAt: FieldValue.serverTimestamp(),
-      }),
+    const ua = parseUserAgent(req.headers.get("user-agent"));
+    const ref = req.headers.get("referer");
+    const country = req.headers.get("x-vercel-ip-country") ?? req.headers.get("cf-ipcountry") ?? null;
+    await Promise.allSettled([
+      docRef.update({ clicks: FieldValue.increment(1), lastAccessedAt: FieldValue.serverTimestamp() }),
       db.collection(CLICKS_COLLECTION).add({
         shortCode,
-        ownerUid: data.ownerUid ?? null,
+        ownerUid: typeof data.ownerUid === "string" ? data.ownerUid : null,
         ts: FieldValue.serverTimestamp(),
         ref: ref ?? null,
         country,
@@ -79,15 +73,10 @@ export async function GET(req: Request, ctx: RouteContext): Promise<NextResponse
         browser: ua.browser,
         os: ua.os,
       }),
-    ];
-    try {
-      await Promise.allSettled(writes);
-    } catch {
-      // ignore analytics write failures
-    }
+    ]);
 
-    return NextResponse.redirect(data.originalUrl, 301);
+    return NextResponse.redirect(data.originalUrl, { status: 302, headers: NO_STORE_HEADERS });
   } catch {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return statusPage(503, "Link unavailable", "Please try again later.");
   }
 }

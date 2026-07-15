@@ -3,8 +3,11 @@ import { Timestamp } from "firebase-admin/firestore";
 import { getAuthFromRequest, getFirestore } from "@/lib/firebaseAdmin";
 import { errorResponse } from "@/lib/http";
 import { aggregate, type ClickRecord } from "@/lib/analytics";
+import { readLinkControls } from "@/lib/linkControls";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const LINKS = "links";
 const CLICKS = "clicks";
@@ -15,16 +18,16 @@ interface RouteContext {
 }
 
 function shortBase(): string {
-  const base =
-    process.env.NEXT_PUBLIC_SHORT_BASE_URL ?? process.env.NEXT_PUBLIC_BASE_URL ?? "";
+  const base = process.env.NEXT_PUBLIC_SHORT_BASE_URL ?? process.env.NEXT_PUBLIC_BASE_URL ?? "";
   return base.replace(/\/+$/, "");
 }
 
-function iso(v: unknown): string | null {
-  return v instanceof Timestamp ? v.toDate().toISOString() : null;
+function iso(value: unknown): string | null {
+  return value instanceof Timestamp ? value.toDate().toISOString() : null;
 }
-function toMillis(v: unknown): number {
-  return v instanceof Timestamp ? v.toMillis() : 0;
+
+function toMillis(value: unknown): number {
+  return value instanceof Timestamp ? value.toMillis() : 0;
 }
 
 export async function GET(req: Request, ctx: RouteContext): Promise<NextResponse> {
@@ -32,24 +35,16 @@ export async function GET(req: Request, ctx: RouteContext): Promise<NextResponse
     const { uid } = await getAuthFromRequest(req);
     const { shortCode } = await ctx.params;
     const db = getFirestore();
-
     const linkSnap = await db.collection(LINKS).doc(shortCode).get();
-    const link = linkSnap.data() as
-      | { originalUrl: string; ownerUid: string; clicks?: number; createdAt?: unknown; lastAccessedAt?: unknown }
-      | undefined;
+    const link = linkSnap.data() as Record<string, unknown> | undefined;
 
     if (!linkSnap.exists || !link || link.ownerUid !== uid) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const clicksSnap = await db
-      .collection(CLICKS)
-      .where("shortCode", "==", shortCode)
-      .limit(MAX_EVENTS)
-      .get();
-
-    const records: ClickRecord[] = clicksSnap.docs.map((d) => {
-      const data = d.data() as Record<string, unknown>;
+    const clicksSnap = await db.collection(CLICKS).where("shortCode", "==", shortCode).limit(MAX_EVENTS).get();
+    const records: ClickRecord[] = clicksSnap.docs.map((doc) => {
+      const data = doc.data() as Record<string, unknown>;
       return {
         ts: toMillis(data.ts),
         ref: (data.ref as string) ?? null,
@@ -60,16 +55,16 @@ export async function GET(req: Request, ctx: RouteContext): Promise<NextResponse
       };
     });
 
-    const base = shortBase();
     return NextResponse.json(
       {
         link: {
           shortCode,
-          shortUrl: `${base}/${shortCode}`,
-          originalUrl: link.originalUrl,
-          clicks: link.clicks ?? 0,
+          shortUrl: `${shortBase()}/${shortCode}`,
+          originalUrl: typeof link.originalUrl === "string" ? link.originalUrl : "",
+          clicks: typeof link.clicks === "number" ? link.clicks : 0,
           createdAt: iso(link.createdAt),
           lastAccessedAt: iso(link.lastAccessedAt),
+          ...readLinkControls(link),
         },
         analytics: aggregate(records),
       },

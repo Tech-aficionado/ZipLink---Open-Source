@@ -21,8 +21,11 @@ export default function ThemeToggle({ className = "" }: { className?: string }) 
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setTheme(getInitialTheme());
-    setMounted(true);
+    const frame = window.requestAnimationFrame(() => {
+      setTheme(getInitialTheme());
+      setMounted(true);
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   const toggle = () => {

@@ -38,7 +38,9 @@ keys, and you're running.
 - **Custom aliases** — let Ziplink generate a code, or choose your own
 - **QR codes** — preview and download a QR for any link
 - **Click tracking** — see how many times each link has been opened, and when
-- **Edit & manage** — change a link's destination, search your links, sort by newest or most clicks, and delete what you don't need
+- **Lifecycle controls (v0.2)** — enable or pause links, schedule when redirects begin, and set optional expiry times
+- **Lifecycle visibility** — clear Active, Scheduled, Paused, Expired, and Error statuses across the dashboard
+- **Edit & manage** — change destinations and lifecycle controls, filter/search/sort links, and delete what you don't need
 - **Dark, modern UI** — dark-first design with a clean, mobile-friendly dashboard
 - **Installable PWA** — add it to your home screen and launch it like an app
 - **Optional split domain** — serve short links from a separate short domain
@@ -147,11 +149,12 @@ purely for redirects. Full walkthrough in [`DEPLOY.md`](DEPLOY.md).
 | Method | Path | Auth | What it does |
 |--------|------|------|--------------|
 | `GET` | `/api/health` | – | Reports service status |
-| `POST` | `/api/links` | ✅ | Create a short link (optional `customCode`) |
-| `GET` | `/api/links` | ✅ | List your links, newest first |
+| `POST` | `/api/links` | ✅ | Create a short link; accepts optional `customCode`, `enabled`, `startsAt`, and `expiresAt` |
+| `GET` | `/api/links` | ✅ | List your links with lifecycle controls and derived status, newest first |
 | `GET` | `/api/links/[code]` | ✅ | Fetch one of your links |
+| `PATCH` | `/api/links/[code]` | ✅ | Update its destination, enabled state, start time, or expiry time |
 | `DELETE` | `/api/links/[code]` | ✅ | Delete one of your links |
-| `GET` | `/[code]` | – | 301 redirect to the original URL, counts the click |
+| `GET` | `/[code]` | – | Dynamic `302` redirect for active links; enforces scheduling/expiry before counting the click |
 
 Authenticated requests send `Authorization: Bearer <Firebase ID token>`.
 

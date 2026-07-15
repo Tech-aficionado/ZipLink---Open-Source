@@ -8,9 +8,11 @@ import Button from "@/components/Button";
 import Spinner from "@/components/Spinner";
 import StatCard from "@/components/StatCard";
 import QrModal from "@/components/QrModal";
+import LifecycleStatusBadge from "@/components/LifecycleStatusBadge";
 import AreaChart from "@/components/charts/AreaChart";
 import DonutChart from "@/components/charts/DonutChart";
 import BarList from "@/components/charts/BarList";
+import { formatLifecycleDate } from "@/lib/linkDates";
 import { ApiError, getLinkAnalytics, type LinkAnalytics, type LinkItem } from "@/lib/api";
 
 const BACKEND_UNCONFIGURED_MESSAGE =
@@ -76,7 +78,8 @@ export default function LinkAnalyticsPage() {
   }, [shortCode]);
 
   useEffect(() => {
-    void load();
+    const frame = window.requestAnimationFrame(() => void load());
+    return () => window.cancelAnimationFrame(frame);
   }, [load]);
 
   const handleCopy = async (link: LinkItem) => {
@@ -171,6 +174,7 @@ function LinkAnalyticsContent({
               >
                 {displayShort(link.shortUrl)}
               </a>
+              <LifecycleStatusBadge status={link.status} />
               <button
                 type="button"
                 onClick={onCopy}
@@ -218,6 +222,23 @@ function LinkAnalyticsContent({
                 Last click {formatExactDate(link.lastAccessedAt)}
               </span>
             </div>
+
+            <dl className="mt-4 grid grid-cols-1 gap-x-6 gap-y-2 rounded-[var(--radius)] bg-surface-muted/70 p-3 text-xs sm:grid-cols-3">
+              <div>
+                <dt className="font-medium uppercase tracking-wide text-muted">Enabled</dt>
+                <dd className="mt-0.5 text-muted-strong">
+                  {typeof link.enabled === "boolean" ? (link.enabled ? "Yes" : "No") : link.enabled == null ? "Yes (legacy default)" : "Invalid"}
+                </dd>
+              </div>
+              <div>
+                <dt className="font-medium uppercase tracking-wide text-muted">Starts</dt>
+                <dd className="mt-0.5 text-muted-strong">{formatLifecycleDate(link.startsAt, "Immediately")}</dd>
+              </div>
+              <div>
+                <dt className="font-medium uppercase tracking-wide text-muted">Expires</dt>
+                <dd className="mt-0.5 text-muted-strong">{formatLifecycleDate(link.expiresAt, "Never")}</dd>
+              </div>
+            </dl>
           </div>
 
           <div className="shrink-0">

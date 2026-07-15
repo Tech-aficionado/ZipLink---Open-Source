@@ -54,7 +54,9 @@ export default function AnalyticsPage() {
   }, [toast]);
 
   useEffect(() => {
-    if (user) void load();
+    if (!user) return;
+    const frame = window.requestAnimationFrame(() => void load());
+    return () => window.cancelAnimationFrame(frame);
   }, [user, load]);
 
   return (

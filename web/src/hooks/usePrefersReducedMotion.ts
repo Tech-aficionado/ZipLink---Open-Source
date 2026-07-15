@@ -1,6 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
+
+const QUERY = "(prefers-reduced-motion: reduce)";
+const subscribe = (onChange: () => void): (() => void) => {
+  const media = window.matchMedia(QUERY);
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
+};
+const getSnapshot = (): boolean => window.matchMedia(QUERY).matches;
+const getServerSnapshot = (): boolean => false;
 
 /**
  * Tracks the user's `prefers-reduced-motion: reduce` setting.
@@ -10,16 +19,5 @@ import { useEffect, useState } from "react";
  * Consumers can use this to skip decorative animation for users who opt out.
  */
 export default function usePrefersReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(false);
-
-  useEffect(() => {
-    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReduced(query.matches);
-
-    const onChange = (event: MediaQueryListEvent) => setReduced(event.matches);
-    query.addEventListener("change", onChange);
-    return () => query.removeEventListener("change", onChange);
-  }, []);
-
-  return reduced;
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }

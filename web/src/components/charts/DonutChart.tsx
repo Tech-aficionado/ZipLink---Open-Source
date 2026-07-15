@@ -26,7 +26,6 @@ export default function DonutChart({ data, className = "", centerLabel }: DonutC
   const stroke = 18;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
-  let offset = 0;
 
   return (
     <div className={`flex items-center gap-5 ${className}`}>
@@ -36,7 +35,10 @@ export default function DonutChart({ data, className = "", centerLabel }: DonutC
           {data.map((d, i) => {
             const frac = d.value / total;
             const dash = frac * c;
-            const seg = (
+            const offset = data
+              .slice(0, i)
+              .reduce((sum, item) => sum + (item.value / total) * c, 0);
+            return (
               <circle
                 key={d.label}
                 cx={size / 2}
@@ -49,8 +51,6 @@ export default function DonutChart({ data, className = "", centerLabel }: DonutC
                 strokeDashoffset={-offset}
               />
             );
-            offset += dash;
-            return seg;
           })}
         </g>
         {centerLabel ? (
