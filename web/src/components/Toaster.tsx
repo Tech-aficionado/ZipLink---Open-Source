@@ -42,10 +42,10 @@ function ToastItem({
   const [reduceMotion, setReduceMotion] = useState(false);
 
   useEffect(() => {
-    setReduceMotion(
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-    );
-    const raf = requestAnimationFrame(() => setEntered(true));
+    const raf = requestAnimationFrame(() => {
+      setReduceMotion(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+      setEntered(true);
+    });
     return () => cancelAnimationFrame(raf);
   }, []);
 

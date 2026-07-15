@@ -34,12 +34,6 @@ export default function BulkActionBar({
     return () => window.clearTimeout(confirmTimer.current);
   }, []);
 
-  // Reset the confirm state if the selection size changes underneath us.
-  useEffect(() => {
-    setConfirming(false);
-    window.clearTimeout(confirmTimer.current);
-  }, [count]);
-
   const handleDeleteClick = async () => {
     if (!confirming) {
       setConfirming(true);

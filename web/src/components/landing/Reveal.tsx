@@ -31,31 +31,36 @@ export default function Reveal({
   const [enhanced, setEnhanced] = useState(false);
 
   useEffect(() => {
-    // Reduced motion (or unsupported observer): render fully visible, no anim.
-    if (reduced || typeof IntersectionObserver === "undefined") {
-      setEnhanced(false);
-      setVisible(true);
-      return;
-    }
-
     const node = ref.current;
-    if (!node) return;
+    let observer: IntersectionObserver | null = null;
 
-    setEnhanced(true);
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            setVisible(true);
-            observer.unobserve(entry.target);
+    const frame = window.requestAnimationFrame(() => {
+      if (reduced || typeof IntersectionObserver === "undefined") {
+        setEnhanced(false);
+        setVisible(true);
+        return;
+      }
+      if (!node) return;
+
+      setEnhanced(true);
+      observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              setVisible(true);
+              observer?.unobserve(entry.target);
+            }
           }
-        }
-      },
-      { threshold: 0.15, rootMargin: "0px 0px -8% 0px" },
-    );
+        },
+        { threshold: 0.15, rootMargin: "0px 0px -8% 0px" },
+      );
+      observer.observe(node);
+    });
 
-    observer.observe(node);
-    return () => observer.disconnect();
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer?.disconnect();
+    };
   }, [reduced]);
 
   const style = enhanced

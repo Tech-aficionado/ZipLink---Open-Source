@@ -101,8 +101,9 @@ export default function GlobalError({
             >
               Try again
             </button>
-            <a
-              href="/"
+            <button
+              type="button"
+              onClick={() => window.location.assign("/")}
               style={{
                 height: "2.75rem",
                 display: "inline-flex",
@@ -110,6 +111,8 @@ export default function GlobalError({
                 padding: "0 1.25rem",
                 borderRadius: "0.625rem",
                 border: "1px solid #2e2e50",
+                background: "transparent",
+                cursor: "pointer",
                 fontSize: "0.875rem",
                 fontWeight: 500,
                 color: "#f2f3fb",
@@ -117,7 +120,7 @@ export default function GlobalError({
               }}
             >
               Go home
-            </a>
+            </button>
           </div>
         </div>
       </body>
