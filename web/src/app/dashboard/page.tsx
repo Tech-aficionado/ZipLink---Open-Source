@@ -374,15 +374,15 @@ export default function LinksPage() {
   return (
     <>
       {/* Create — page centerpiece */}
-      <section className="animate-fade-up glass-card glass-ring overflow-hidden p-6 sm:p-8">
+      <section className="animate-fade-up glass-card glass-ring min-w-0 overflow-hidden p-4 sm:p-6 md:p-8">
         <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1 brand-gradient" />
-        <h1 className="text-2xl font-semibold tracking-tight brand-text">Shorten a link</h1>
+        <h1 className="text-xl font-semibold tracking-tight brand-text sm:text-2xl">Shorten a link</h1>
         <p className="mt-1 text-sm text-muted">
           Paste a long URL and get a clean, trackable Ziplink — ready to share in seconds.
         </p>
 
-        <form onSubmit={handleCreate} className="mt-5 flex flex-col gap-3" noValidate>
-          <div className="flex flex-col gap-3 sm:flex-row">
+        <form onSubmit={handleCreate} className="mt-5 flex min-w-0 flex-col gap-3" noValidate>
+          <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_10rem]">
             <input
               ref={urlInputRef}
               type="url"
@@ -392,17 +392,20 @@ export default function LinksPage() {
               placeholder="https://example.com/a-very-long-link-to-shorten"
               aria-label="URL to shorten"
               aria-invalid={formError ? true : undefined}
-              className="zip-field flex-1"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              className="zip-field min-w-0 max-w-full"
             />
-            <Button type="submit" size="lg" loading={creating} className="w-full sm:w-40">
+            <Button type="submit" size="lg" loading={creating} className="w-full md:w-40">
               {creating ? "Shortening" : "Shorten link"}
             </Button>
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex min-w-0 flex-col gap-1.5">
             <div className="grid min-w-0 grid-cols-[minmax(0,auto)_minmax(0,1fr)] overflow-hidden rounded-[var(--radius)] border border-border-strong bg-surface transition-[border-color,box-shadow] focus-within:border-brand-500 focus-within:shadow-[var(--ring)]">
               <span
-                className="flex min-w-0 max-w-[45vw] items-center overflow-hidden text-ellipsis whitespace-nowrap bg-surface-muted px-3 font-mono text-xs text-muted sm:max-w-72"
+                className="flex min-w-0 max-w-[42vw] items-center overflow-hidden text-ellipsis whitespace-nowrap bg-surface-muted px-3 font-mono text-xs text-muted sm:max-w-72"
                 aria-hidden="true"
                 title={aliasPrefix}
               >
@@ -425,13 +428,13 @@ export default function LinksPage() {
             <p id="alias-help" className="text-xs text-muted">{ALIAS_HELP}</p>
           </div>
 
-          <details className="rounded-[var(--radius)] border border-border bg-surface/60 px-4 py-3">
+          <details className="min-w-0 rounded-[var(--radius)] border border-border bg-surface/60 px-3 py-3 sm:px-4">
             <summary className="cursor-pointer text-sm font-medium text-muted-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
               Advanced controls
             </summary>
-            <div className="mt-4 space-y-4">
+            <div className="mt-4 min-w-0 space-y-4">
               <label className="flex cursor-pointer items-start justify-between gap-4">
-                <span>
+                <span className="min-w-0">
                   <span className="block text-sm font-medium text-foreground">Enable link</span>
                   <span className="block text-xs text-muted">Turn this off to pause redirects.</span>
                 </span>
@@ -442,27 +445,27 @@ export default function LinksPage() {
                   className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
                 />
               </label>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className="text-xs font-medium text-muted-strong">
+              <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="min-w-0 text-xs font-medium text-muted-strong">
                   Starts at (optional)
                   <input
                     type="datetime-local"
                     value={startsAt}
                     onChange={(event) => setStartsAt(event.target.value)}
-                    className="zip-field mt-1.5"
+                    className="zip-field mt-1.5 min-w-0 max-w-full"
                   />
                 </label>
-                <label className="text-xs font-medium text-muted-strong">
+                <label className="min-w-0 text-xs font-medium text-muted-strong">
                   Expires at (optional)
                   <input
                     type="datetime-local"
                     value={expiresAt}
                     onChange={(event) => setExpiresAt(event.target.value)}
-                    className="zip-field mt-1.5"
+                    className="zip-field mt-1.5 min-w-0 max-w-full"
                   />
                 </label>
               </div>
-              <p className="text-xs text-muted">Times use your browser timezone: {timeZone}.</p>
+              <p className="break-words text-xs text-muted">Times use your browser timezone: {timeZone}.</p>
               <CampaignFields
                 idPrefix="create-campaign"
                 originalUrl={url}
@@ -476,13 +479,13 @@ export default function LinksPage() {
         </form>
 
         {formError ? (
-          <p role="alert" className="mt-3 rounded-[var(--radius)] bg-[color:var(--danger-soft)] px-3 py-2.5 text-sm text-danger">
+          <p role="alert" className="mt-3 break-words rounded-[var(--radius)] bg-[color:var(--danger-soft)] px-3 py-2.5 text-sm text-danger">
             {formError}
           </p>
         ) : null}
 
         {lastCreated && !formError ? (
-          <div className="animate-fade-up mt-4 flex flex-col gap-3 rounded-[var(--radius-lg)] border border-brand-200/70 bg-[color:color-mix(in_srgb,var(--brand-500)_12%,transparent)] px-4 py-3.5 backdrop-blur-sm dark:border-brand-800/70 sm:flex-row sm:items-center sm:justify-between">
+          <div className="animate-fade-up mt-4 flex min-w-0 flex-col gap-3 rounded-[var(--radius-lg)] border border-brand-200/70 bg-[color:color-mix(in_srgb,var(--brand-500)_12%,transparent)] px-3 py-3.5 backdrop-blur-sm dark:border-brand-800/70 sm:flex-row sm:items-center sm:justify-between sm:px-4">
             <div className="min-w-0">
               <p className="text-xs font-medium uppercase tracking-wide text-brand-600 dark:text-brand-300">
                 Your short link is ready
@@ -496,7 +499,7 @@ export default function LinksPage() {
                 {lastCreated.shortUrl}
               </a>
             </div>
-            <Button variant="primary" size="sm" onClick={handleCopyCreated} className="shrink-0">
+            <Button variant="primary" size="sm" onClick={handleCopyCreated} className="w-full shrink-0 sm:w-auto">
               {copied ? "Copied!" : "Copy link"}
             </Button>
           </div>

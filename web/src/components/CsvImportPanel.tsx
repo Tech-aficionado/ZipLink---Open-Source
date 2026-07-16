@@ -375,7 +375,7 @@ export default function CsvImportPanel({ onCompleted }: CsvImportPanelProps) {
           onChange={handleFileChange}
           disabled={processing}
           aria-describedby="csv-import-help"
-          className="block w-full rounded-[var(--radius-sm)] border border-border-strong bg-surface px-3 py-2 text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-surface-muted file:px-3 file:py-2 file:text-sm file:font-medium file:text-foreground hover:file:bg-border focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed disabled:opacity-60"
+          className="block min-w-0 max-w-full text-ellipsis rounded-[var(--radius-sm)] border border-border-strong bg-surface px-2 py-2 text-sm text-foreground file:mr-2 file:max-w-[55%] file:truncate file:rounded-md file:border-0 file:bg-surface-muted file:px-3 file:py-2 file:text-sm file:font-medium file:text-foreground hover:file:bg-border focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed disabled:opacity-60 sm:px-3 sm:file:mr-3 sm:file:max-w-none"
         />
         <p id="csv-import-help" className="text-xs text-muted">
           The file is validated locally before an import job is created.

@@ -178,7 +178,7 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
 
         {/* Content */}
         <div className="relative z-10 min-w-0 flex-1 lg:pl-60">
-          <main className="mx-auto w-full max-w-5xl px-4 pb-24 pt-8 sm:px-6 sm:pt-10 lg:pb-10">
+          <main className="mx-auto w-full max-w-5xl px-3 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 min-[360px]:px-4 sm:px-6 sm:pt-8 lg:pb-10 lg:pt-10">
             {children}
           </main>
         </div>
