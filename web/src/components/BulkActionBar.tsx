@@ -63,12 +63,12 @@ export default function BulkActionBar({
           </span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-end">
           <Button
             variant="secondary"
             size="sm"
             onClick={onExportSelected}
-            className="min-h-10"
+            className="min-h-10 w-full sm:w-auto"
           >
             Export CSV
           </Button>
@@ -77,7 +77,7 @@ export default function BulkActionBar({
             size="sm"
             onClick={handleDeleteClick}
             disabled={deleting}
-            className="min-h-10"
+            className="min-h-10 w-full sm:w-auto"
           >
             {deleting ? (
               <>
@@ -94,7 +94,7 @@ export default function BulkActionBar({
             size="sm"
             onClick={onClear}
             disabled={deleting}
-            className="min-h-10"
+            className="col-span-2 min-h-10 w-full sm:w-auto"
           >
             Clear
           </Button>

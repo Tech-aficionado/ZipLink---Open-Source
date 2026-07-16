@@ -86,11 +86,14 @@ export default function CampaignFields({
         <p className="mt-1 text-xs text-muted">Up to five comma-separated tags.</p>
       </div>
 
-      <fieldset>
+      <fieldset className="min-w-0">
         <legend className="text-xs font-medium text-muted-strong">UTM builder (optional)</legend>
-        <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="mt-2 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
           {UTM_FIELDS.map(({ key, label, required }) => (
-            <label key={key} className={key === "campaign" ? "sm:col-span-2" : ""}>
+            <label
+              key={key}
+              className={`min-w-0 ${key === "campaign" ? "sm:col-span-2" : ""}`}
+            >
               <span className="text-xs text-muted-strong">
                 {label}{required ? " *" : ""}
               </span>
@@ -98,13 +101,13 @@ export default function CampaignFields({
                 value={utm[key]}
                 onChange={(event) => onUtmChange({ ...utm, [key]: event.target.value })}
                 placeholder={key === "source" ? "newsletter" : key === "medium" ? "email" : ""}
-                className="zip-field mt-1.5"
+                className="zip-field mt-1.5 min-w-0 max-w-full"
                 maxLength={100}
               />
             </label>
           ))}
         </div>
-        <p className="mt-2 text-xs text-muted">Source, medium, and campaign are required when UTM fields are used.</p>
+        <p className="mt-2 break-words text-xs text-muted">Source, medium, and campaign are required when UTM fields are used.</p>
       </fieldset>
 
       {preview ? (
